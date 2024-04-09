@@ -169,6 +169,8 @@ config MFD_BD9571MWV
 	  This driver can also be built as a module. If so, the module
 	  will be called bd9571mwv.
 
+source "drivers/mfd/caninos/Kconfig"
+
 config MFD_AC100
 	tristate "X-Powers AC100"
 	select MFD_CORE

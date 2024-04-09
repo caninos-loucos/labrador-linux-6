@@ -1,0 +1,18 @@
+config SND_SOC_CANINOS
+	bool
+	depends on SND_SOC
+
+config SND_SOC_CANINOS_CODEC
+	bool
+	depends on SND_SOC_CANINOS
+
+config SND_SOC_ALL_CANINOS
+	bool "SoC Audio support for all Caninos Labrador boards"
+	select SND_SOC_CANINOS
+	select SND_SOC_CANINOS_CODEC
+	select SND_SOC_GENERIC_DMAENGINE_PCM
+	depends on MFD_CANINOS_PMIC
+	help
+	  Say Y if you want to add support for SoC audio on 
+	  Caninos Labrador board.
+

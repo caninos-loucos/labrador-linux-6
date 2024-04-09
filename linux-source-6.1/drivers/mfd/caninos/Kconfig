@@ -1,0 +1,24 @@
+    
+config MFD_CANINOS_PMIC
+	bool "Caninos Labrador PMIC"
+	select MFD_CORE
+	select REGMAP_I2C
+	select REGMAP_IRQ
+	depends on I2C && OF
+	help
+	  Support for the Caninos Labrador PMIC.
+	  This driver provides common support for accessing the device, additional 
+	  drivers must be enabled in order to use the functionality of the device.
+
+config MFD_CANINOS_AUXADC
+	bool "Caninos Labrador PMICs Auxiliary ADC"
+	depends on MFD_CANINOS_PMIC
+	help
+	  Support for reading the Caninos Labrador PMICs auxiliary ADC inputs.
+
+config MFD_CANINOS_BATTERY
+	bool "Caninos Labrador PMICs Battery Charging"
+	depends on MFD_CANINOS_PMIC
+	help
+	  Support for Caninos Labrador PMICs battery charging.
+

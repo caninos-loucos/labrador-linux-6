@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config ARCH_CANINOS
+	bool "Caninos Labrador"
+	depends on ARCH_MULTI_V7
+	select CACHE_L2X0
+	select ARM_HAS_SG_CHAIN
+	select ARM_PATCH_PHYS_VIRT
+	select TIMER_OF
+	select COMMON_CLK
+	select GENERIC_CLOCKEVENTS
+	select GENERIC_IRQ_MULTI_HANDLER
+	select SPARSE_IRQ
+	select USE_OF
+	select MACH_CANINOS
+	help
+	  This enables support for the Caninos Labrador.
+
+if ARCH_CANINOS
+
+config MACH_CANINOS
+	bool
+	select ARM_AMBA
+	select ARM_GIC
+	select ARM_GLOBAL_TIMER
+	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+	select PM
+	select GENERIC_IRQ_CHIP
+	select HAVE_ARM_SCU
+	select HAVE_ARM_TWD
+	select HAVE_ARM_ARCH_TIMER
+	select HAS_DMA
+	select DMADEVICES
+	select ARCH_REQUIRE_GPIOLIB
+	select ARCH_HAS_OPP
+	select ARCH_HAS_CPUFREQ
+	select OF_ADDRESS
+	select HIGHMEM
+	select VFP
+	select CANINOS_TIMER
+	select RESET_CONTROLLER
+	select CANINOS_PM_DOMAINS
+	select DMA_CANINOS
+	select PINCTRL
+	select PINCTRL_CANINOS
+
+endif
