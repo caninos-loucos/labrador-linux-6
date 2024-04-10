@@ -514,6 +514,13 @@ config I2C_CBUS_GPIO
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-cbus-gpio.
 
+config I2C_CANINOS
+	bool "Caninos Labrador I2C Controller"
+	depends on ARCH_CANINOS || COMPILE_TEST
+	help
+	  Say Y here if you want to use the I2C bus controller on
+	  the Caninos Labrador SBC.
+
 config I2C_CPM
 	tristate "Freescale CPM1 or CPM2 (MPC8xx/826x)"
 	depends on CPM1 || CPM2

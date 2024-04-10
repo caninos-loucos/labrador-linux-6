@@ -165,6 +165,13 @@ config TEGRA186_TIMER
 	  Enables support for the timers and watchdogs found on NVIDIA
 	  Tegra186 and later SoCs.
 
+config CANINOS_TIMER
+	bool "Caninos timer driver" if COMPILE_TEST
+	select CLKSRC_MMIO
+	depends on ARCH_CANINOS
+	help
+	  Enables the support for the Caninos Labrador timer driver.
+
 config VT8500_TIMER
 	bool "VT8500 timer driver" if COMPILE_TEST
 	depends on HAS_IOMEM

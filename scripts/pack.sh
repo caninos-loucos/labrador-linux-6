@@ -12,11 +12,6 @@ if [ ! -d "$1" ]; then
 	exit 1
 fi
 
-if [ ! -d "$2" ]; then
-	echo "Error: release directory '$2' does not exist"
-	exit 1
-fi
-
 mach=${3^^}
 
 case $mach in

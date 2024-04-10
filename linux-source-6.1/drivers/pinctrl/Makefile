@@ -55,6 +55,7 @@ obj-y				+= actions/
 obj-$(CONFIG_ARCH_ASPEED)	+= aspeed/
 obj-y				+= bcm/
 obj-$(CONFIG_PINCTRL_BERLIN)	+= berlin/
+obj-$(CONFIG_ARCH_CANINOS)		+= caninos/
 obj-y				+= cirrus/
 obj-y				+= freescale/
 obj-$(CONFIG_X86)		+= intel/

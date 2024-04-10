@@ -1457,6 +1457,25 @@ config SERIAL_OWL_CONSOLE
 	  Say 'Y' here if you wish to use Actions Semiconductor S500/S900 UART
 	  as the system console.
 
+config SERIAL_CANINOS
+	bool "Caninos Labrador serial port support"
+	depends on ARCH_CANINOS || COMPILE_TEST
+	select SERIAL_CORE
+	help
+	  This driver is for Caninos Labrador's UART.
+	  Say 'Y' here if you wish to use the on-board serial port.
+	  Otherwise, say 'N'.
+
+config SERIAL_CANINOS_CONSOLE
+	bool "Console on Caninos Labrador serial port"
+	depends on SERIAL_CANINOS=y
+	select SERIAL_CORE_CONSOLE
+	select SERIAL_EARLYCON
+	default y
+	help
+	  Say 'Y' here if you wish to use Caninos Labrador UART
+	  as the system console.
+
 config SERIAL_RDA
 	bool "RDA Micro serial port support"
 	depends on ARCH_RDA || COMPILE_TEST
