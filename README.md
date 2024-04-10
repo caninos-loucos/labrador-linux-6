@@ -94,9 +94,7 @@ make clean
 
 ## Kernel
 
-After successful compilation, the kernel should be located in the "output"
- folder for 64-bit architectures or in the "output32" folder for
- 32-bit architectures.
+After successful compilation, kernel should be located in the "release" folder.
 
 ## Contributing
 
