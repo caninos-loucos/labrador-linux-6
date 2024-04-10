@@ -13,7 +13,7 @@ SCRIPTS_DIR=$(CURDIR)/scripts
 #
 RELEASE_VER=v01
 RELEASE_DIR=$(CURDIR)/release
-RELEASE_NAME=labrador-kernel5
+RELEASE_NAME=labrador-kernel6
 
 .PHONY: all32 config32 menuconfig32 dtbs32 image32 kernel32 clean32 install32
 
