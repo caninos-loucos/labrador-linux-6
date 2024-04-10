@@ -1211,6 +1211,15 @@ static void volume_control_quirks(struct usb_mixer_elem_info *cval,
 			cval->res = 16;
 		}
 		break;
+	case USB_ID(0x1bcf, 0x2cd1): // Caninos Labrador
+		if (!strcmp(kctl->id.name, "Mic Capture Volume")) {
+			usb_audio_info(chip,
+				"set volume quirk for Sunplus Innovation Technology Inc.\n");
+			cval->min = 256;
+			cval->max = 4096;
+			cval->res = 10;
+		}
+		break;
 	}
 }
 

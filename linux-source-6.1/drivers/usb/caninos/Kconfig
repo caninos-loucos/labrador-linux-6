@@ -1,0 +1,9 @@
+config USB_CANINOS
+	tristate "Caninos USB2.0 HCD support"
+	depends on ARCH_CANINOS
+	help
+	  Enables support for Caninos Labrador SBCs USB2.0 host controller.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called caninoshcd.
+

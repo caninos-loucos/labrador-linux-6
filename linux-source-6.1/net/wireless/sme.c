@@ -836,7 +836,8 @@ void __cfg80211_connect_result(struct net_device *dev,
 		return;
 	}
 
-	if (WARN_ON(bss_not_found)) {
+	//if (WARN_ON(bss_not_found)) { -> Original
+	if (bss_not_found) { //Caninos Labrador
 		cfg80211_connect_result_release_bsses(wdev, cr);
 		return;
 	}

@@ -43,14 +43,14 @@ static int bpfilter_send_req(struct mbox_request *req)
 	n = kernel_write(bpfilter_ops.info.pipe_to_umh, req, sizeof(*req),
 			   &pos);
 	if (n != sizeof(*req)) {
-		pr_err("write fail %zd\n", n);
+		//pr_err("write fail %zd\n", n); Caninos Labrador
 		goto stop;
 	}
 	pos = 0;
 	n = kernel_read(bpfilter_ops.info.pipe_from_umh, &reply, sizeof(reply),
 			&pos);
 	if (n != sizeof(reply)) {
-		pr_err("read fail %zd\n", n);
+		//pr_err("read fail %zd\n", n); Caninos Labrador
 		goto stop;
 	}
 	return reply.status;
@@ -86,7 +86,9 @@ static int start_umh(void)
 	err = fork_usermode_driver(&bpfilter_ops.info);
 	if (err)
 		return err;
-	pr_info("Loaded bpfilter_umh pid %d\n", pid_nr(bpfilter_ops.info.tgid));
+	
+	//Caninos Labrador
+	//pr_info("Loaded bpfilter_umh pid %d\n", pid_nr(bpfilter_ops.info.tgid));
 
 	/* health check that usermode process started correctly */
 	if (bpfilter_send_req(&req) != 0) {

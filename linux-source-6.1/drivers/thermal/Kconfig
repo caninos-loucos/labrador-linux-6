@@ -434,6 +434,13 @@ config AMLOGIC_THERMAL
 	  This driver can also be built as a module. If so, the module will
 	  be called amlogic_thermal.
 
+config CANINOS_THERMAL
+	bool "Temperature sensor driver for Caninos Labrador SBCs"
+	depends on (ARCH_CANINOS || COMPILE_TEST)
+	default (ARCH_CANINOS)
+	help
+	  Enable this option to support thermal sensors on Caninos Labrador SBCs.
+
 menu "Intel thermal drivers"
 depends on X86 || X86_INTEL_QUARK || COMPILE_TEST
 source "drivers/thermal/intel/Kconfig"
