@@ -212,6 +212,16 @@ config DWMAC_SUN8I
 	  stmmac device driver. This driver is used for H3/A83T/A64
 	  EMAC ethernet controller.
 
+config DWMAC_CANINOS
+	tristate "Caninos Labrador DWMAC support"
+	default (ARCH_CANINOS && ARM64)
+	depends on OF && ARM64 && (ARCH_CANINOS || COMPILE_TEST)
+	help
+	  Support for Caninos Labrador ethernet controllers.
+
+	  This selects Caninos Labrador SoC glue layer support for the
+	  stmmac device driver.
+
 config DWMAC_IMX8
 	tristate "NXP IMX8 DWMAC support"
 	default ARCH_MXC

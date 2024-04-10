@@ -849,6 +849,31 @@ static irqreturn_t rtl9000a_handle_interrupt(struct phy_device *phydev)
 	return IRQ_HANDLED;
 }
 
+// -----------------------------------> Caninos Labrador
+#define PHY_RTL8201F_REG_RMSR           0x10
+#define PHY_RTL8201F_REG_INT_LED_FUNC   0x13
+
+#define PHY_RTL8201F_LINK_STATUS_CHANGE     (0x1<<11)
+#define PHY_RTL8201F_RMSR_CLK_DIR_INPUT     (0x1<<12)
+#define PHY_RTL8201F_RMSR_RMII_MODE         (0x1<<3)
+#define PHY_RTL8201F_RMSR_RMII_RX_OFFSET    (0xF<<4)
+#define PHY_RTL8201F_RMSR_RMII_TX_OFFSET    (0xF<<8)
+#define PHY_RTL8201F_PIN_LINK_STATE_CHANGE  (0x1<<4)
+
+static int rtl8201_config_init(struct phy_device *phydev)
+{
+	dev_info(&phydev->mdio.dev, "custom initalization of RTL8201F\n");
+	
+	phy_write_paged(phydev, 0x7, RTL8201F_IER, (1<<4));
+	
+	return phy_write_paged(phydev, 0x7, PHY_RTL8201F_REG_RMSR,
+	                       PHY_RTL8201F_RMSR_CLK_DIR_INPUT |
+	                       PHY_RTL8201F_RMSR_RMII_MODE | 
+	                       PHY_RTL8201F_RMSR_RMII_RX_OFFSET | 
+	                       PHY_RTL8201F_RMSR_RMII_TX_OFFSET);
+}
+// Caninos Labrador <-----------------------------------
+
 static struct phy_driver realtek_drvs[] = {
 	{
 		PHY_ID_MATCH_EXACT(0x00008201),
@@ -859,6 +884,7 @@ static struct phy_driver realtek_drvs[] = {
 		PHY_ID_MATCH_EXACT(0x001cc816),
 		.name		= "RTL8201F Fast Ethernet",
 		.config_intr	= &rtl8201_config_intr,
+		.config_init	= &rtl8201_config_init, //Caninos Labrador
 		.handle_interrupt = rtl8201_handle_interrupt,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
