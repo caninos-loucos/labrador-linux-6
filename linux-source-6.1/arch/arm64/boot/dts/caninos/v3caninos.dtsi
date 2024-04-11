@@ -563,7 +563,7 @@
 			#size-cells = <0>;
 			
 			atc260x: atc2603c@65 {
-				compatible = "caninos,atc2603c";
+				compatible = "atc2603c";
 				reg = <0x65>;
 				
 				atc260x_audio: atc260x-audio {

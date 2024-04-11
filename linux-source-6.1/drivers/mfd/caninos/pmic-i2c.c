@@ -32,7 +32,7 @@
 #define MFD_CELL_OF_NAME(_name, _compat) \
 	{ .name = _name, .of_compatible = _compat, }
 
-static struct atc260x_dev pmic = { NULL };
+static struct atc260x_dev pmic = { .dev = NULL };
 
 static struct regmap_config atc2603c_i2c_regmap_config = {
 	.reg_bits = 8,
@@ -193,7 +193,8 @@ static int atc260x_i2c_probe(struct i2c_client *i2c,
 		return ret;
 	}
 	
-	ret = devm_mfd_add_devices(&i2c->dev, 0, sc_atc2603c_cells,
+	ret = devm_mfd_add_devices(&i2c->dev, PLATFORM_DEVID_NONE,
+	                           sc_atc2603c_cells,
 	                           ARRAY_SIZE(sc_atc2603c_cells),
 	                           NULL, 0, NULL);
 	
@@ -217,11 +218,12 @@ static void atc260x_i2c_remove(struct i2c_client *i2c)
 		pm_power_off = NULL;
 	}
 	unregister_restart_handler(&atc260x_restart_nb);
+	pmic.dev = NULL;
 }
 
 const struct i2c_device_id atc260x_i2c_id[] = {
-	{ "caninos,atc2603c", ATC260X_ICTYPE_2603C },
-	{ "caninos,atc2609a", ATC260X_ICTYPE_2609A },
+	{ "atc2603c", ATC260X_ICTYPE_2603C },
+	{ "atc2609a", ATC260X_ICTYPE_2609A },
 	{ /* sentinel */ }
 };
 MODULE_DEVICE_TABLE(i2c, atc260x_i2c_id);
