@@ -680,21 +680,19 @@
 		};
 		
 		emac: ethernet@e0220000 {
-			compatible = "caninos,k7-gmac", "snps,dwmac";
+			compatible = "caninos,k7-gmac";
 			reg = <0x0 0xe0220000 0 0x2000>;
 			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
 			interrupt-names = "macirq";
 			clocks = <&cmu CLK_ETHERNET>, <&cmu CLK_RMII_REF>;
-			clock-names = "stmmaceth", "rmii";
+			clock-names = "stmmaceth", "pclk";
 			resets = <&rst RST_ETHERNET>;
 			reset-names = "stmmaceth";
 			
-			pinctrl-names = "rmii", "rgmii";
-			pinctrl-0 = <&eth_state_rmii>;
-			pinctrl-1 = <&eth_state_rgmii>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&eth_state_rgmii>;
 			
 			phy-power-gpio = <&gpiob 11 GPIO_ACTIVE_HIGH>;
-			phy-reset-gpio = <&gpiod 31 GPIO_ACTIVE_HIGH>; 
 			phy-handle = <&phy0>;
 			
 			status = "okay";
@@ -705,8 +703,11 @@
 				#size-cells = <0>;
 				
 				phy0: ethernet-phy@0 {
-					reg = <0x1>;
+					reg = <0x0>;
 					device_type = "ethernet-phy";
+					reset-assert-us = <20000>;
+					reset-deassert-us = <200000>;
+					reset-gpios = <&gpiod 31 GPIO_ACTIVE_LOW>;
 				};
 			};
 		};

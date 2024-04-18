@@ -719,6 +719,7 @@ void __init k7_clk_init(struct device_node *np)
 	struct caninos_clk_provider *ctx = caninos_clk_init(np, CLK_NR_CLKS);
 	
 	if (ctx) {
+		writel(0x1, ctx->reg_base + CMU_ETHERNETPLL);
 		caninos_register_clk_tree(ctx, &k7_clk_tree);
 		pr_info("probe finished\n");
 	}

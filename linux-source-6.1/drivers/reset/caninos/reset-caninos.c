@@ -130,21 +130,18 @@ static int caninos_rcu_reset_status(struct reset_controller_dev *rcdev,
                                     unsigned long id)
 {
 	struct caninos_rcu_reset_priv *priv = to_caninos_rcu_reset_priv(rcdev);
-	u32 val, deassert_val, assert_val;
+	void __iomem *base = priv->cmu_base + priv->data[id].offset;
+	u32 cur_val, mask = priv->data[id].mask;
 	unsigned long flags;
 	
 	spin_lock_irqsave(&priv->lock, flags);
-	val = readl(priv->cmu_base + priv->data[id].offset);
+	cur_val = readl(base);
 	spin_unlock_irqrestore(&priv->lock, flags);
 	
-	val &= priv->data[id].mask;
-	assert_val = priv->data[id].assert & priv->data[id].mask;
-	deassert_val = priv->data[id].deassert & priv->data[id].mask;
-	
-	if (val == assert_val) {
+	if ((cur_val & mask) == (priv->data[id].assert & mask)) {
 		return 1;
 	}
-	else if (val == deassert_val) {
+	if ((cur_val & mask) == (priv->data[id].deassert & mask)) {
 		return 0;
 	}
 	return -EINVAL;
@@ -154,31 +151,36 @@ static int caninos_rcu_reset_update(struct reset_controller_dev *rcdev,
                                     unsigned long id, bool assert)
 {
 	struct caninos_rcu_reset_priv *priv = to_caninos_rcu_reset_priv(rcdev);
+	void __iomem *base = priv->cmu_base + priv->data[id].offset;
+	u32 new_val, cur_val, mask = priv->data[id].mask;
 	unsigned long flags;
-	u32 val, new_val;
+	bool update = false;
 	
 	spin_lock_irqsave(&priv->lock, flags);
-	val = readl(priv->cmu_base + priv->data[id].offset);
-	new_val = val & ~(priv->data[id].mask);
+	cur_val = readl(base);
+	new_val = cur_val & ~mask;
 	
 	if (assert) {
-		new_val |= priv->data[id].assert & priv->data[id].mask;
+		new_val |= priv->data[id].assert & mask;
 	}
 	else {
-		new_val |= priv->data[id].deassert & priv->data[id].mask;
+		new_val |= priv->data[id].deassert & mask;
 	}
-	
-	if (val != new_val) {
-		writel(new_val, priv->cmu_base + priv->data[id].offset);
+	if (cur_val != new_val) {
+		writel(new_val, base);
+		update = true;
 	}
-	
-	val = readl(priv->cmu_base + priv->data[id].offset);
 	spin_unlock_irqrestore(&priv->lock, flags);
 	
-	if (val != new_val) {
-		return -EINVAL;
+	if (update) {
+		udelay(assert ? 10 : 100);
 	}
-	return 0;
+	
+	spin_lock_irqsave(&priv->lock, flags);
+	cur_val = readl(base);
+	spin_unlock_irqrestore(&priv->lock, flags);
+	
+	return ((cur_val & mask) == (new_val & mask)) ? 0 : -EINVAL;
 }
 
 static int caninos_rcu_reset_assert(struct reset_controller_dev *rcdev,
@@ -262,16 +264,14 @@ static int caninos_rcu_reset_probe(struct platform_device *pdev)
 	priv->rcdev.nr_resets = NR_RESETS;
 	priv->data = of_id->data;
 	
-	if (!priv->data)
-	{
+	if (!priv->data) {
 		dev_err(dev, "invalid device specific data\n");
 		return -EINVAL;
 	}
 	
 	priv->cmu_base = devm_ioremap(dev, res->start, resource_size(res));
 	
-	if (IS_ERR(priv->cmu_base))
-	{
+	if (IS_ERR(priv->cmu_base)) {
 		dev_err(dev, "could not map cmu-base registers\n");
 		return PTR_ERR(priv->cmu_base);
 	}
