@@ -20,7 +20,7 @@ enum lima_gpu_id {
 };
 
 enum lima_ip_id {
-	lima_ip_pmu,
+	lima_ip_pmu = 0,
 	lima_ip_gpmmu,
 	lima_ip_ppmmu0,
 	lima_ip_ppmmu1,
@@ -83,6 +83,7 @@ struct lima_device {
 	u32 gp_version;
 	u32 pp_version;
 	int num_pp;
+	int shared_irq;
 
 	void __iomem *iomem;
 	struct clk *clk_bus;

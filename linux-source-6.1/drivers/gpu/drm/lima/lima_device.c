@@ -7,6 +7,7 @@
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
+#include <linux/of.h>
 
 #include "lima_device.h"
 #include "lima_gp.h"
@@ -80,6 +81,38 @@ static struct lima_ip_desc lima_ip_desc[lima_ip_num] = {
 const char *lima_ip_name(struct lima_ip *ip)
 {
 	return lima_ip_desc[ip->id].name;
+}
+
+static int lima_ip_get_pp_num(struct lima_ip *ip)
+{
+	switch (ip->id) {
+	case lima_ip_ppmmu0:
+	case lima_ip_pp0:
+		return 0;
+	case lima_ip_ppmmu1:
+	case lima_ip_pp1:
+		return 1;
+	case lima_ip_ppmmu2:
+	case lima_ip_pp2:
+		return 2;
+	case lima_ip_ppmmu3:
+	case lima_ip_pp3:
+		return 3;
+	case lima_ip_ppmmu4:
+	case lima_ip_pp4:
+		return 4;
+	case lima_ip_ppmmu5:
+	case lima_ip_pp5:
+		return 5;
+	case lima_ip_ppmmu6:
+	case lima_ip_pp6:
+		return 6;
+	case lima_ip_ppmmu7:
+	case lima_ip_pp7:
+		return 7;
+	default:
+		return -1;
+	}
 }
 
 static int lima_clk_enable(struct lima_device *dev)
@@ -221,11 +254,20 @@ static int lima_init_ip(struct lima_device *dev, int index)
 	ip->dev = dev;
 	ip->id = index;
 	ip->iomem = dev->iomem + offset;
+
 	if (irq_name) {
-		err = must ? platform_get_irq_byname(pdev, irq_name) :
-			     platform_get_irq_byname_optional(pdev, irq_name);
+		if (dev->shared_irq > 0) {
+			err = dev->shared_irq;
+			if (lima_ip_get_pp_num(ip) >= dev->num_pp)
+				err = -EINVAL;
+		}
+		else {
+			err = must ? platform_get_irq_byname(pdev, irq_name) :
+			      platform_get_irq_byname_optional(pdev, irq_name);
+		}
 		if (err < 0)
 			goto out;
+		
 		ip->irq = err;
 	}
 
@@ -393,6 +435,29 @@ int lima_device_init(struct lima_device *ldev)
 		err = PTR_ERR(ldev->iomem);
 		goto err_out3;
 	}
+	
+	ldev->num_pp = 0;
+	ldev->shared_irq = platform_get_irq_byname_optional(pdev, "mali");
+	
+	if (ldev->shared_irq > 0) {
+		u32 val = 0x0;
+		dev_info(ldev->dev, "using shared irq %d\n", ldev->shared_irq);
+		of_property_read_u32(ldev->dev->of_node, "mali,num_pp", &val);
+		
+		if (!val) {
+			dev_err(ldev->dev, "fail to read mali,num_pp from dts\n");
+			err = -EINVAL;
+			goto err_out3;
+		}
+		
+		if (ldev->id == lima_gpu_mali450)
+			val = (val > 0x8) ? 0x8 : val;
+		else
+			val = (val > 0x4) ? 0x4 : val;
+		
+		ldev->num_pp = val;
+		dev_info(ldev->dev, "num_pp = %u\n", ldev->num_pp);
+	}
 
 	for (i = 0; i < lima_ip_num; i++) {
 		err = lima_init_ip(ldev, i);
@@ -416,7 +481,6 @@ int lima_device_init(struct lima_device *ldev)
 
 	dev_info(ldev->dev, "bus rate = %lu\n", clk_get_rate(ldev->clk_bus));
 	dev_info(ldev->dev, "mod rate = %lu", clk_get_rate(ldev->clk_gpu));
-
 	return 0;
 
 err_out5:
