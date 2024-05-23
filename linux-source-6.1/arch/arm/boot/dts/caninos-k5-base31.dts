@@ -1,0 +1,81 @@
+/// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+/dts-v1/;
+#include "caninos-k5.dtsi"
+
+/ {
+	chosen {
+		stdout-path = "serial3:115200n8";
+	};
+	
+	soc {
+		leds {
+			compatible = "gpio-leds";
+			
+			led@1 {
+				label = "led1";
+				gpios = <&gpiob 12 GPIO_ACTIVE_HIGH>;
+				linux,default-trigger = "default-on";
+				default-state = "ON";
+			};
+			
+			led@2 {
+				label = "led2";
+				gpios = <&gpiob 31 GPIO_ACTIVE_HIGH>;
+				linux,default-trigger = "heartbeat";
+				default-state = "ON";
+			};
+		};
+	};
+		
+	spi0: spi-gpio {
+		compatible = "spi-gpio";
+		miso-gpios = <&gpiod 25 GPIO_ACTIVE_HIGH>;
+		mosi-gpios = <&gpiod 24 GPIO_ACTIVE_HIGH>;
+		sck-gpios  = <&gpioc 22 GPIO_ACTIVE_HIGH>; // B2 for core 3.3; C22 for core 3.2 & 2.2
+		cs-gpios   = <&gpioc 3  GPIO_ACTIVE_LOW>,
+					<&gpioc 2  GPIO_ACTIVE_LOW>;
+		cs-num = <2>;
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		status = "okay";
+
+		cam_m8q: spi@0 {
+			compatible = "linux,spidev";
+			reg = <0>;
+			// reset = <&exgpio 1 GPIO_ACTIVE_LOW>;
+			// int = <&gpiob 30 GPIO_ACTIVE_HIGH>;
+		};
+
+		sx1272: spi@1 {
+			compatible = "caninos,sx1272-simple";
+			reg = <1>;
+			reset-gpios = <&exgpio 0 GPIO_ACTIVE_HIGH>;
+			dio0-gpios = <&gpiob 11 GPIO_ACTIVE_HIGH>;
+			txen-gpios = <&atc260x_gpio 4 GPIO_ACTIVE_HIGH>;
+			pa-boost;
+			xtal = <32000000>;
+			status = "okay";
+		};
+	};
+};
+
+&i2c2 {
+    exgpio: exgpio@20 {
+        compatible = "nxp,pca9575";
+        reg = <0x20>;
+        gpio-controller;
+        #gpio-cells = <2>;
+        reset-gpios = <&gpioc 8 GPIO_ACTIVE_LOW>;
+    };
+};
+
+&mmc1 {		
+	enable-gpios = <&exgpio 4 GPIO_ACTIVE_HIGH>;
+};
+
+&emac {
+	phy-reset-gpio = <&exgpio 4 GPIO_ACTIVE_HIGH>;
+};

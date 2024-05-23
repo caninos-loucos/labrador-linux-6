@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+/dts-v1/;
+#include "caninos-k7.dtsi"
+
+/ {
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
+	};
+	
+	cpus {
+		cpu@0 {
+			enable-method = "psci";
+		};
+		cpu@1 {
+			enable-method = "psci";
+		};
+		cpu@2 {
+			enable-method = "psci";
+		};
+		cpu@3 {
+			enable-method = "psci";
+		};
+	};
+};
+
+&emac {
+	phy-mode = "rmii";
+	max-speed = <100>;
+	phy-power-gpio = <&gpiob 11 GPIO_ACTIVE_HIGH>;
+	phy-reset-gpio = <&gpiod 31 GPIO_ACTIVE_HIGH>;
+};
+
+&mmc1 {
+	enable-gpios = <&gpiob 30 GPIO_ACTIVE_HIGH>, 
+				   <&gpioc 3  GPIO_ACTIVE_HIGH>;
+};

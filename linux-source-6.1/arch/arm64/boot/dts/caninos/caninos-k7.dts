@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+/dts-v1/;
+#include "caninos-k7.dtsi"
+
+/ {
+	chosen {
+		stdout-path = "serial3:115200n8";
+	};
+	
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
+	};
+	
+	cpus {
+		cpu@0 {
+			enable-method = "psci";
+		};
+		cpu@1 {
+			enable-method = "psci";
+		};
+		cpu@2 {
+			enable-method = "psci";
+		};
+		cpu@3 {
+			enable-method = "psci";
+		};
+	};
+
+
+	soc {
+		
+		leds {
+			compatible = "gpio-leds";
+			
+			led@1 {
+				label = "led1"; //LVDS_RXOC_P - GPIOB12
+				gpios = <&gpiob 12 GPIO_ACTIVE_HIGH>;
+				linux,default-trigger = "default-on";
+				default-state = "ON";
+			};
+			
+			led@2 {
+				label = "led2"; //LCD0_D17 - GPIOB31
+				gpios = <&gpiob 31 GPIO_ACTIVE_HIGH>;
+				linux,default-trigger = "heartbeat";
+				default-state = "ON";
+			};
+		};
+	};
+};
+
+&emac {
+	phy-mode = "rmii";
+	max-speed = <100>;
+
+	phy-power-gpio = <&gpiob 11 GPIO_ACTIVE_HIGH>;
+	phy-reset-gpio = <&gpiod 31 GPIO_ACTIVE_HIGH>; 
+};
+
+&mmc1 {
+	enable-gpios = <&gpiob 30 GPIO_ACTIVE_HIGH>, 
+				   <&gpioc 3  GPIO_ACTIVE_HIGH>;
+};

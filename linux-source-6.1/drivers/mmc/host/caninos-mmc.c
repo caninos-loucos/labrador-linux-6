@@ -132,7 +132,7 @@ caninos_mmc_set_gpios(struct caninos_gpio *gpios, int count, bool val)
 {
 	int i;
 	for (i = 0; i < count; i++) {
-		gpio_set_value(gpios[i].gpio, gpios[i].invert ^ val);
+		gpio_set_value_cansleep(gpios[i].gpio, gpios[i].invert ^ val);
 	}
 }
 
