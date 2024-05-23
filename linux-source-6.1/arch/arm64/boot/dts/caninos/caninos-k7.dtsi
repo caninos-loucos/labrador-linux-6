@@ -641,27 +641,12 @@
 		gpu: gpu@e0340000 {
 			compatible = "allwinner,sun50i-h5-mali", "arm,mali-450";
 			reg = <0x0 0xe0340000 0x0 0x30000>;
-			
-			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-			             <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-			 
-			interrupt-names = "pmu", "gp", "gpmmu", "pp", "pp0", "ppmmu0",
-			                  "pp1", "ppmmu1", "pp2", "ppmmu2", "pp3", "ppmmu3";
-			
 			clocks = <&gpucmu CLK_GPU_BUS>, <&gpucmu CLK_GPU_CORE>;
 			clock-names = "bus", "core";
 			resets = <&rst RST_GPU3D>;
-			
+			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "mali";
+			mali,num_pp = <0x4>;
 			status = "disabled";
 		};
 		
