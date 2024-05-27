@@ -2121,6 +2121,10 @@ config MFD_ATC260X_I2C
 	  and ATC2609A chip variants, additional drivers must be enabled
 	  in order to use the functionality of the device.
 
+config MFD_ATC260X_GPIO
+    tristate "Actions Semi ATC260X PMIC GPIO controller"
+    depends on MFD_ATC260X_I2C
+
 config MFD_KHADAS_MCU
 	tristate "Support for Khadas System control Microcontroller"
 	depends on I2C

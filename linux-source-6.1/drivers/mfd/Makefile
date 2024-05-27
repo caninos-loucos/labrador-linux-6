@@ -273,8 +273,9 @@ obj-$(CONFIG_SGI_MFD_IOC3)	+= ioc3.o
 obj-$(CONFIG_MFD_SIMPLE_MFD_I2C)	+= simple-mfd-i2c.o
 obj-$(CONFIG_MFD_INTEL_M10_BMC)   += intel-m10-bmc.o
 
-obj-$(CONFIG_MFD_ATC260X)	+= atc260x-core.o
+obj-$(CONFIG_MFD_ATC260X)	    += atc260x-core.o
 obj-$(CONFIG_MFD_ATC260X_I2C)	+= atc260x-i2c.o
+obj-$(CONFIG_MFD_ATC260X_GPIO)  += atc260x-gpio.o
 
 rsmu-i2c-objs			:= rsmu_core.o rsmu_i2c.o
 rsmu-spi-objs			:= rsmu_core.o rsmu_spi.o
