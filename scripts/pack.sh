@@ -71,6 +71,7 @@ else
 	name=${4}-armhf-${5}.tar.gz
 	nameSHA256=${4}-armhf-${5}.sha256
 	cp "${buildDir}"/arch/arm/boot/dts/caninos-k5.dtb "${outputDir}"/kernel.dtb
+	cp "${buildDir}"/arch/arm/boot/dts/caninos-k5-base31.dtb "${outputDir}"/kernel-base31.dtb
 	cp "${buildDir}"/arch/arm/boot/uImage "${outputDir}"
 	cp -rf "${buildDir}"/lib/modules "${libDir}"
 fi

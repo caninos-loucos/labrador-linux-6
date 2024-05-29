@@ -64,6 +64,7 @@
 		
 		/* reserve 48MB for framebuffer */
 		fb_reserved: framebuffer@2d000000 {
+			compatible = "shared-dma-pool";
 			reg = <0x2d000000 0x3000000>;
 			no-map;
 		};
@@ -635,7 +636,6 @@
 		vdc: vdc@0xb02e0000 {
 			compatible = "caninos,k5-vdc";
 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-			memory-region = <&fb_reserved>;
 			clocks = <&cmu CLK_DE>;
 			clock-names = "de";
 			reg = <0xb02e0000 0x1014>;
@@ -649,6 +649,7 @@
 			compatible = "caninos,drm";
 			hdmi-controller = <&hdmi>;
 			display-controller = <&vdc>;
+			memory-region = <&fb_reserved>;
 			status = "okay";
 		};
 		
