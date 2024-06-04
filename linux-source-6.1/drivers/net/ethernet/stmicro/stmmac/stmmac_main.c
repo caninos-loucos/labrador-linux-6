@@ -477,8 +477,6 @@ bool stmmac_eee_init(struct stmmac_priv *priv)
 	    priv->hw->pcs == STMMAC_PCS_RTBI)
 		return false;
 	
-	return false;
-	
 	/* Check if MAC core supports the EEE feature. */
 	if (!priv->dma_cap.eee)
 		return false;

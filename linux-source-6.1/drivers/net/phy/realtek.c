@@ -52,6 +52,7 @@
 						 RTL8201F_ISR_DUPLEX | \
 						 RTL8201F_ISR_LINK)
 #define RTL8201F_IER				0x13
+#define RTL8201F_RMSR				0x10
 
 #define RTL8366RB_POWER_SAVE			0x15
 #define RTL8366RB_POWER_SAVE_ON			BIT(12)
@@ -164,10 +165,11 @@ static int rtl8201_config_intr(struct phy_device *phydev)
 		if (err)
 			return err;
 
-		val = BIT(13) | BIT(12) | BIT(11);
+		val = BIT(4) | BIT(13) | BIT(12) | BIT(11);
 		err = phy_write_paged(phydev, 0x7, RTL8201F_IER, val);
+		
 	} else {
-		val = 0;
+		val = BIT(4);
 		err = phy_write_paged(phydev, 0x7, RTL8201F_IER, val);
 		if (err)
 			return err;
@@ -326,6 +328,29 @@ static int rtl8211_config_aneg(struct phy_device *phydev)
 	}
 
 	return 0;
+}
+
+static int rtl8201_config_init(struct phy_device *phydev)
+{
+	int ret;
+	
+	ret = phy_write_paged(phydev, 0x7, RTL8201F_IER, BIT(4));
+	if (ret)
+		return ret;
+	
+	ret = phy_write_paged(phydev, 0x7, RTL8201F_RMSR, 0x1ff8);
+	if (ret)
+		return ret;
+	
+	ret = phy_clear_bits(phydev, 24, BIT(15));
+	if (ret)
+		return ret;
+	
+	ret = phy_write_paged(phydev, 0x4, 16, 0x4077);
+	if (ret)
+		return ret;
+	
+	return phy_write_paged(phydev, 0x7, 24, 0x1);
 }
 
 static int rtl8211c_config_init(struct phy_device *phydev)
@@ -849,43 +874,6 @@ static irqreturn_t rtl9000a_handle_interrupt(struct phy_device *phydev)
 	return IRQ_HANDLED;
 }
 
-// -----------------------------------> Caninos Labrador
-#define PHY_RTL8201F_REG_RMSR           0x10
-#define PHY_RTL8201F_REG_INT_LED_FUNC   0x13
-
-#define PHY_RTL8201F_LINK_STATUS_CHANGE     (0x1<<11)
-#define PHY_RTL8201F_RMSR_CLK_DIR_INPUT     (0x1<<12)
-#define PHY_RTL8201F_RMSR_RMII_MODE         (0x1<<3)
-#define PHY_RTL8201F_RMSR_RMII_RX_OFFSET    (0x0<<4)
-#define PHY_RTL8201F_RMSR_RMII_TX_OFFSET    (0xF<<8)
-#define PHY_RTL8201F_PIN_LINK_STATE_CHANGE  (0x1<<4)
-
-static int rtl8201_suspend(struct phy_device *phydev)
-{
-	phydev_info(phydev, "suspend\n");
-	
-	return genphy_suspend(phydev);
-}
-
-static int rtl8201_resume(struct phy_device *phydev)
-{
-	phydev_info(phydev, "resume\n");
-	
-	return genphy_resume(phydev);
-}
-
-static int rtl8201_config_init(struct phy_device *phydev)
-{
-	phydev_info(phydev, "custom initalization\n");
-	
-	return phy_write_paged(phydev, 0x7, PHY_RTL8201F_REG_RMSR,
-	                       PHY_RTL8201F_RMSR_CLK_DIR_INPUT |
-	                       PHY_RTL8201F_RMSR_RMII_MODE | 
-	                       PHY_RTL8201F_RMSR_RMII_RX_OFFSET | 
-	                       PHY_RTL8201F_RMSR_RMII_TX_OFFSET);
-}
-// Caninos Labrador <-----------------------------------
-
 static struct phy_driver realtek_drvs[] = {
 	{
 		PHY_ID_MATCH_EXACT(0x00008201),
@@ -896,10 +884,10 @@ static struct phy_driver realtek_drvs[] = {
 		PHY_ID_MATCH_EXACT(0x001cc816),
 		.name		= "RTL8201F Fast Ethernet",
 		.config_intr	= &rtl8201_config_intr,
-		.config_init	= &rtl8201_config_init, //Caninos Labrador
+		.config_init	= &rtl8201_config_init,
 		.handle_interrupt = rtl8201_handle_interrupt,
-		.suspend	= rtl8201_suspend,
-		.resume		= rtl8201_resume,
+		.suspend	= genphy_suspend,
+		.resume		= genphy_resume,
 		.read_page	= rtl821x_read_page,
 		.write_page	= rtl821x_write_page,
 	}, {
