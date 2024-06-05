@@ -120,6 +120,11 @@
 		#size-cells = <2>;
 		ranges;
 		
+		regmap_reset: regmap-reset@e01680a8 {
+			compatible = "caninos,cmu-devrst-reg", "syscon";
+			reg = <0x0 0xe01680a8 0x0 0x08>;
+		};
+		
 		cmu: clock-controller@e0168000 {
 			compatible = "caninos,k7-cmu";
 			reg = <0 0xe0168000 0 0x1000>;
@@ -161,9 +166,9 @@
 			status = "okay";
 		};
 		
-		rst: reset-controller@e01680a8 {
+		rst: reset-controller {
 			compatible = "caninos,k7-reset";
-			reg = <0x0 0xe01680a8 0x0 0x08>;
+			caninos,reset-regmap = <&regmap_reset>;
 			#reset-cells = <1>;
 			status = "okay";
 		};
@@ -673,6 +678,7 @@
 			clock-names = "stmmaceth", "pclk";
 			resets = <&rst RST_ETHERNET>;
 			reset-names = "stmmaceth";
+			caninos,reset-regmap = <&regmap_reset>;
 			
 			pinctrl-names = "default";
 			pinctrl-0 = <&eth_state_rgmii>;

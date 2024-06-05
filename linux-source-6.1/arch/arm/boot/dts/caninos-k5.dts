@@ -126,6 +126,11 @@
 		#size-cells = <1>;
 		ranges;
 		
+		regmap_reset: regmap-reset@b01600a8 {
+			compatible = "caninos,cmu-devrst-reg", "syscon";
+			reg = <0xb01600a8 0x08>;
+		};
+		
 		scu: scu@b0020000 {
 			compatible = "arm,cortex-a9-scu";
 			reg = <0xb0020000 0x100>;
@@ -190,9 +195,9 @@
 			status = "okay";
 		};
 		
-		rst: reset-controller@b01600a8 {
+		rst: reset-controller {
 			compatible = "caninos,k5-reset";
-			reg = <0xb01600a8 0x08>;
+			caninos,reset-regmap = <&regmap_reset>;
 			#reset-cells = <1>;
 			status = "okay";
 		};
