@@ -2,5 +2,6 @@ config RESET_CANINOS
 	bool "Caninos Labrador reset controller"
 	depends on (ARCH_CANINOS || COMPILE_TEST)
 	default ARCH_CANINOS
+	select MFD_SYSCON
 	help
 	  This enables the reset controller driver for Caninos Labrador boards.

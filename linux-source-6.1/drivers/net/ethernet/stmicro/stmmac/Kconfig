@@ -216,6 +216,7 @@ config DWMAC_CANINOS
 	tristate "Caninos Labrador DWMAC support"
 	default (ARCH_CANINOS && ARM64)
 	depends on OF && ARM64 && (ARCH_CANINOS || COMPILE_TEST)
+	select MFD_SYSCON
 	help
 	  Support for Caninos Labrador ethernet controllers.
 
