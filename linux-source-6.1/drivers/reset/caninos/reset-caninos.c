@@ -27,6 +27,7 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/delay.h>
+#include <linux/kobject.h>
 
 #include <dt-bindings/reset/caninos-rst.h>
 
@@ -117,6 +118,7 @@ struct caninos_rcu_reset_priv
 	struct device *dev;
 	void __iomem *cmu_base;
 	const struct caninos_rcu_reset_reg_data *data;
+	struct kobject kobj;
 	spinlock_t lock;
 };
 
@@ -207,11 +209,126 @@ static int caninos_rcu_reset_reset(struct reset_controller_dev *rcdev,
 	return caninos_rcu_reset_deassert(rcdev, id);
 }
 
+static void gmac_delay_kobj_release(struct kobject *kobj) {
+	/* do nothing */
+}
+
+static ssize_t rx_delay_store(struct kobject *kobj,
+                              struct kobj_attribute *attr,
+                              const char *buf, size_t count)
+{
+	struct caninos_rcu_reset_priv *priv = 
+		container_of(kobj,struct caninos_rcu_reset_priv, kobj);
+	unsigned long flags;
+	unsigned int tmp;
+	int ret = -EIO;
+	char *buf_cp;
+	u32 val;
+	
+	buf_cp = kstrdup(buf, GFP_KERNEL);
+	
+	if (!buf_cp)
+		return -ENOMEM;
+	
+	if ((sscanf(buf_cp, "%u", &tmp) == 1) && (tmp <= 0xF))
+	{
+		spin_lock_irqsave(&priv->lock, flags);
+		val = readl(priv->cmu_base + DEVRST1) & ~(0xF << 19);
+		writel(val | (tmp << 19), priv->cmu_base + DEVRST1);
+		spin_unlock_irqrestore(&priv->lock, flags);
+		ret = 0;
+	}
+	
+	kfree(buf_cp);
+	return ret ? ret : count;
+}
+
+static ssize_t tx_delay_store(struct kobject *kobj,
+                              struct kobj_attribute *attr,
+                              const char *buf, size_t count)
+{
+	struct caninos_rcu_reset_priv *priv = 
+		container_of(kobj,struct caninos_rcu_reset_priv, kobj);
+	unsigned long flags;
+	unsigned int tmp;
+	int ret = -EIO;
+	char *buf_cp;
+	u32 val;
+	
+	buf_cp = kstrdup(buf, GFP_KERNEL);
+	
+	if (!buf_cp)
+		return -ENOMEM;
+	
+	if ((sscanf(buf_cp, "%u", &tmp) == 1) && (tmp <= 0xF))
+	{
+		spin_lock_irqsave(&priv->lock, flags);
+		val = readl(priv->cmu_base + DEVRST1) & ~(0xF << 15);
+		writel(val | (tmp << 15), priv->cmu_base + DEVRST1);
+		spin_unlock_irqrestore(&priv->lock, flags);
+		ret = 0;
+	}
+	
+	kfree(buf_cp);
+	return ret ? ret : count;
+}
+
+static ssize_t rx_delay_show(struct kobject *kobj,
+                             struct kobj_attribute *attr, char *buf)
+{
+	struct caninos_rcu_reset_priv *priv = 
+		container_of(kobj,struct caninos_rcu_reset_priv, kobj);
+	unsigned long flags;
+	u32 val;
+	
+	spin_lock_irqsave(&priv->lock, flags);
+	val = readl(priv->cmu_base + DEVRST1);
+	spin_unlock_irqrestore(&priv->lock, flags);
+	
+	val = (val >> 19) & 0xF;
+	return sysfs_emit(buf, "%u\n", val);
+}
+
+static ssize_t tx_delay_show(struct kobject *kobj,
+                             struct kobj_attribute *attr, char *buf)
+{
+	struct caninos_rcu_reset_priv *priv = 
+		container_of(kobj,struct caninos_rcu_reset_priv, kobj);
+	unsigned long flags;
+	u32 val;
+	
+	spin_lock_irqsave(&priv->lock, flags);
+	val = readl(priv->cmu_base + DEVRST1);
+	spin_unlock_irqrestore(&priv->lock, flags);
+	
+	val = (val >> 15) & 0xF;
+	return sysfs_emit(buf, "%u\n", val);
+}
+
+static struct kobj_attribute rx_delay_attr = __ATTR_RW_MODE(rx_delay, 0644);
+
+static struct kobj_attribute tx_delay_attr = __ATTR_RW_MODE(tx_delay, 0644);
+
+static struct attribute *gmac_delay_attrs[] = {
+	&rx_delay_attr.attr,
+	&tx_delay_attr.attr,
+	NULL,
+};
+
 static const struct reset_control_ops caninos_rcu_reset_ops = {
 	.assert   = caninos_rcu_reset_assert,
 	.deassert = caninos_rcu_reset_deassert,
 	.status   = caninos_rcu_reset_status,
 	.reset    = caninos_rcu_reset_reset,
+};
+
+static struct attribute_group attr_group = {
+	.attrs = gmac_delay_attrs,
+};
+
+static struct kobj_type gmac_delay_ktype = {
+	.release = gmac_delay_kobj_release,
+	.sysfs_ops = &kobj_sysfs_ops,
 };
 
 static const struct of_device_id caninos_rcu_reset_dt_ids[] = {
@@ -232,26 +349,23 @@ static int caninos_rcu_reset_probe(struct platform_device *pdev)
 	
 	of_id = of_match_node(caninos_rcu_reset_dt_ids, dev->of_node);
 	
-	if (!of_id)
-	{
+	if (!of_id) {
 		dev_err(dev, "could not match device type\n");
 		return -ENODEV;
 	}
 	
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	
-	if (!res)
-	{
+	if (!res) {
 		dev_err(dev, "could not get register base from DTS\n");
-		return -ENOMEM;
+		return -ENODEV;
 	}
 	
 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 	
-	if (IS_ERR(priv))
-	{
+	if (!priv) {
 		dev_err(dev, "could not allocate private memory\n");
-		return PTR_ERR(priv);
+		return -ENOMEM;
 	}
 	
 	priv->dev = dev;
@@ -277,7 +391,6 @@ static int caninos_rcu_reset_probe(struct platform_device *pdev)
 	}
 	
 	/* Set ethernet gmac delays */
-	
 	if (priv->data == (void*) &k7_reg_data)
 	{
 		aux = readl(priv->cmu_base + DEVRST1);
@@ -286,32 +399,67 @@ static int caninos_rcu_reset_probe(struct platform_device *pdev)
 	
 		if (aux != readl(priv->cmu_base + DEVRST1))
 		{
-			dev_err(dev, "could not set ethernet gmac delays\n");
+			dev_err(dev, "unable to set default gmac delays\n");
 			return -EINVAL;
+		}
+		
+		/* create /sys/kernel/gmac */
+		ret = kobject_init_and_add(&priv->kobj, &gmac_delay_ktype,
+		                           kernel_kobj, "gmac");
+		
+		if (ret) {
+			kobject_put(&priv->kobj);
+			dev_err(dev, "unable to create sysfs entry\n");
+			return ret;
+		}
+		
+		/* create group:
+		 * /sys/kernel/gmac/tx_delay
+		 * /sys/kernel/gmac/rx_delay
+		 */
+		ret = sysfs_create_group(&priv->kobj, &attr_group);
+		
+		if (ret) {
+			kobject_put(&priv->kobj);
+			dev_err(dev, "unable to create sysfs group\n");
+			return ret;
 		}
 	}
 	
 	ret = devm_reset_controller_register(dev, &priv->rcdev);
 	
-	if (!ret) {
-		dev_info(dev, "probe finished\n");
-	}
-	else {
+	if (ret) {
+		if (priv->kobj.state_initialized)
+			kobject_put(&priv->kobj);
 		dev_err(dev, "could not register reset controller\n");
+		return ret;
 	}
+	
+	platform_set_drvdata(pdev, priv);
+	dev_info(dev, "probe finished\n");
 	return ret;
+}
+
+static int caninos_rcu_reset_remove(struct platform_device *pdev)
+{
+	struct caninos_rcu_reset_priv *priv = platform_get_drvdata(pdev);
+	
+	if (priv && priv->kobj.state_initialized) {
+		kobject_put(&priv->kobj);
+	}
+	return 0;
 }
 
 static struct platform_driver caninos_rcu_reset_driver = {
 	.probe = caninos_rcu_reset_probe,
+	.remove = caninos_rcu_reset_remove,
 	.driver = {
 		.name = DRIVER_NAME,
-		.of_match_table	= caninos_rcu_reset_dt_ids,
+		.of_match_table = caninos_rcu_reset_dt_ids,
 	},
 };
 module_platform_driver(caninos_rcu_reset_driver);
 
 MODULE_AUTHOR("Edgar Bernardi Righi <edgar.righi@lsitec.org.br>");
 MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_LICENSE("GPL");
-
+MODULE_LICENSE("GPL v2");
