@@ -55,8 +55,8 @@
 	phy-mode = "rmii";
 	max-speed = <100>;
 
-	phy-power-gpio = <&gpiob 11 GPIO_ACTIVE_HIGH>;
-	phy-reset-gpio = <&gpiod 31 GPIO_ACTIVE_HIGH>; 
+	power-gpios = <&gpiob 11 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&gpiod 31 GPIO_ACTIVE_HIGH>; 
 };
 
 &mmc1 {

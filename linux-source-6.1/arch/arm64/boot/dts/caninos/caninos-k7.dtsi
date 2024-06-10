@@ -683,7 +683,6 @@
 					device_type = "ethernet-phy";
 					reset-assert-us = <20000>;
 					reset-deassert-us = <200000>;
-					reset-gpios = <&gpiod 31 GPIO_ACTIVE_LOW>;
 				};
 			};
 		};

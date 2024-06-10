@@ -95,7 +95,7 @@
 	phy-mode = "rmii";
 	max-speed = <100>;
 
-	phy-reset-gpio = <&exgpio 4 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&exgpio 4 GPIO_ACTIVE_HIGH>;
 };
 
 &mmc1 {
