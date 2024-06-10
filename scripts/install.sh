@@ -83,6 +83,7 @@ fi
 echo "Copying files..."
 sudo cp ${outputDir}/Image ${BOOTDIR}
 sudo cp ${outputDir}/*.dtb ${BOOTDIR}
+sudo cp ${outputDir}/caninos-k7.dtb ${BOOTDIR}/v3psci.dtb
 sudo cp -r ${outputDir}/lib/modules ${LIBDIR}
 sudo sync
 
