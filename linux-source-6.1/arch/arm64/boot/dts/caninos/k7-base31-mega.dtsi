@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+#include "k7-base3x.dtsi"
+
+/ {
+	model = "Caninos Labrador 7 (Base 3.1 Mega)";
+};
+
+&i2c2 {
+    exgpio: exgpio@20 {
+        compatible = "nxp,pca9575";
+        reg = <0x20>;
+        gpio-controller;
+        #gpio-cells = <2>;
+        reset-gpios = <&gpioc 8 GPIO_ACTIVE_LOW>;
+    };
+};
+
+&mmc1 {
+	enable-gpios = <&exgpio 2 GPIO_ACTIVE_HIGH>, <&exgpio 4 GPIO_ACTIVE_HIGH>;
+};
+
+&emac {
+	phy-mode = "rmii";
+};
+
+&phy0 {
+	max-speed = <100>;
+};

@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+#include "k7-base3x.dtsi"
+
+/ {
+	model = "Caninos Labrador 7 (Bankhar 1.0)";
+};
+
+&mmc1 {
+	enable-gpios = <&gpiob 30 GPIO_ACTIVE_HIGH>, <&gpioc 3 GPIO_ACTIVE_HIGH>;
+};
+
+&emac {
+	phy-mode = "rgmii";
+	
+	mdio {
+		reset-gpios = <&gpiod 31 GPIO_ACTIVE_LOW>;
+		reset-delay-us = <20000>;
+		reset-post-delay-us = <150000>;
+	};
+};
+
+&phy0 {
+	max-speed = <1000>;
+};

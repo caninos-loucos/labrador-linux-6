@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/dts-v1/;
+#include "k7-bankhar10.dtsi"
+
+/ {
+	chosen {
+		stdout-path = "serial3:115200n8";
+	};
+};

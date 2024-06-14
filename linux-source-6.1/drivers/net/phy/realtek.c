@@ -332,13 +332,30 @@ static int rtl8211_config_aneg(struct phy_device *phydev)
 
 static int rtl8201_config_init(struct phy_device *phydev)
 {
+	struct device *dev = &phydev->mdio.dev;
+	u32 tx_delay, rx_delay, rmsr;
 	int ret;
+	
+	ret = of_property_read_u32(dev->of_node, "realtek,tx-delay", &tx_delay);
+	
+	if (!ret && tx_delay <= 0xf)
+		dev_info(dev, "Using custom TX delay (0x%x)\n", tx_delay);
+	else
+		tx_delay = 0xf; /* use default tx delay */
+	
+	ret = of_property_read_u32(dev->of_node, "realtek,rx-delay", &rx_delay);
+	
+	if (!ret && rx_delay <= 0xf)
+		dev_info(dev, "Using custom RX delay (0x%x)\n", rx_delay);
+	else
+		rx_delay = 0xf; /* use default rx delay */
 	
 	ret = phy_write_paged(phydev, 0x7, RTL8201F_IER, BIT(4));
 	if (ret)
 		return ret;
 	
-	ret = phy_write_paged(phydev, 0x7, RTL8201F_RMSR, 0x1ff8);
+	rmsr = 0x1008 | (rx_delay << 4) | (tx_delay << 8);
+	ret = phy_write_paged(phydev, 0x7, RTL8201F_RMSR, rmsr);
 	if (ret)
 		return ret;
 	
