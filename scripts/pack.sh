@@ -65,7 +65,7 @@ if [ "$mach" = "AARCH64" ]; then
 	name=${4}-aarch64-${5}.tar.gz
 	nameSHA256=${4}-aarch64-${5}.sha256
 	cp "${buildDir}"/arch/arm64/boot/dts/caninos/*.dtb "${outputDir}"
-	cp "${buildDir}"/arch/arm64/boot/dts/caninos/k7-base22.dtb "${outputDir}"/v3psci.dtb
+	cp "${buildDir}"/arch/arm64/boot/dts/caninos/k7-base21.dtb "${outputDir}"/v3psci.dtb
 	cp "${buildDir}"/arch/arm64/boot/Image "${outputDir}"
 	cp -rf "${buildDir}"/lib/modules "${libDir}"
 else
