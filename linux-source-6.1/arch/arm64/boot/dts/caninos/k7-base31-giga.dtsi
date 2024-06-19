@@ -5,6 +5,41 @@
 	model = "Caninos Labrador 7 (Base 3.1 Giga)";
 };
 
+&soc {        
+    spi0: spi-gpio {
+        compatible = "spi-gpio";
+        miso-gpios = <&gpiod 25 GPIO_ACTIVE_HIGH>;
+        mosi-gpios = <&gpiod 24 GPIO_ACTIVE_HIGH>;
+        sck-gpios  = <&gpiob 2  GPIO_ACTIVE_HIGH>;
+        cs-gpios   = <&gpioc 3  GPIO_ACTIVE_LOW>,
+                    <&gpioc 2  GPIO_ACTIVE_LOW>;
+        cs-num = <2>;
+
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        max-speed = <100000>;
+        
+        status="okay";
+
+        cam_m8q: spi@0 {
+            compatible = "linux,spidev";
+            reg = <0>;
+        };
+
+        sx1272: spi@1 {
+            compatible = "caninos,sx1272-simple";
+            reg = <1>;
+            reset-gpios = <&exgpio 0 GPIO_ACTIVE_LOW>;
+            dio0-gpios = <&gpiob 11 GPIO_ACTIVE_HIGH>;
+            txen-gpios = <&atc260x_gpio 4 GPIO_ACTIVE_HIGH>;
+            xtal = <32000000>;
+            pa-boost;
+            status = "okay";
+        };
+    };
+};
+
 &i2c2 {
     exgpio: exgpio@20 {
         compatible = "nxp,pca9575";

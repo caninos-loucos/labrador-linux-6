@@ -497,6 +497,11 @@ config VCPU_STALL_DETECTOR
 
 	  If you do not intend to run this kernel as a guest, say N.
 
+config SX127X
+	tristate "Lora sx1272 driver for Labrador board"
+	help
+	  This driver provides support for sx1272 lora chip on Labrador board.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
