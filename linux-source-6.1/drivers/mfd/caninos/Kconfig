@@ -22,3 +22,9 @@ config MFD_CANINOS_BATTERY
 	help
 	  Support for Caninos Labrador PMICs battery charging.
 
+
+config MFD_CANINOS_GPIO
+	bool "Caninos Labrador PMICs GPIO"
+	depends on MFD_CANINOS_PMIC
+	help
+	  Support for Caninos Labrador PMICs GPIO.
