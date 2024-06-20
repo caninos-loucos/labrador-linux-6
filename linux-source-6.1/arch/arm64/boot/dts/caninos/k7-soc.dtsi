@@ -126,7 +126,7 @@
 		clock-frequency = <24000000>;
 	};
 	
-	soc: soc {
+	soc: soc-bus {
 		compatible = "simple-bus";
 		#address-cells = <2>;
 		#size-cells = <2>;

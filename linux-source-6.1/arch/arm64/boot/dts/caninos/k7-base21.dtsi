@@ -3,24 +3,24 @@
 
 / {
 	model = "Caninos Labrador 7 (Base 2.1)";
-	
-	soc {
-		leds {
-			compatible = "gpio-leds";
-			
-			led@1 {
-				label = "led1";
-				gpios = <&gpiob 12 GPIO_ACTIVE_HIGH>;
-				linux,default-trigger = "default-on";
-				default-state = "ON";
-			};
-			
-			led@2 {
-				label = "led2";
-				gpios = <&gpiob 31 GPIO_ACTIVE_HIGH>;
-				linux,default-trigger = "heartbeat";
-				default-state = "ON";
-			};
+};
+
+&soc {
+	leds {
+		compatible = "gpio-leds";
+		
+		led@1 {
+			label = "led1";
+			gpios = <&gpiob 12 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "default-on";
+			default-state = "ON";
+		};
+		
+		led@2 {
+			label = "led2";
+			gpios = <&gpiob 31 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "heartbeat";
+			default-state = "ON";
 		};
 	};
 };
