@@ -193,4 +193,17 @@ config JZ4770_PHY
 	  This driver provides PHY support for the USB controller found
 	  on the JZ-series and X-series SoCs from Ingenic.
 
+config OWL_USB2PHY
+	tristate "ACTIONS OWL USB2 PHY Driver"
+	help
+	  Enable this to support the USB2 PHY that is part of SOC. This
+	  driver takes care of all the PHY functionality.
+
+config OWL_USB3PHY
+	tristate "ACTIONS OWL USB3 PHY Driver"
+	help
+	  Enable this to support the USB3 PHY that is part of SOC. This
+	  driver takes care of all the PHY functionality.
+
+
 endmenu
