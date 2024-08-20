@@ -19,8 +19,7 @@ void _rtw_init_stainfo(struct sta_info *psta)
 	/* INIT_LIST_HEAD(&psta->sleep_list); */
 	/* INIT_LIST_HEAD(&psta->wakeup_list); */
 
-	INIT_LIST_HEAD(&psta->sleep_q.queue);
-	spin_lock_init(&psta->sleep_q.lock);
+	_rtw_init_queue(&psta->sleep_q);
 	psta->sleepq_len = 0;
 
 	_rtw_init_sta_xmit_priv(&psta->sta_xmitpriv);
@@ -63,17 +62,14 @@ u32 _rtw_init_sta_priv(struct	sta_priv *pstapriv)
 	pstapriv->pstainfo_buf = pstapriv->pallocated_stainfo_buf + 4 -
 		((SIZE_PTR)(pstapriv->pallocated_stainfo_buf) & 3);
 
-	INIT_LIST_HEAD(&pstapriv->free_sta_queue.queue);
-	spin_lock_init(&pstapriv->free_sta_queue.lock);
+	_rtw_init_queue(&pstapriv->free_sta_queue);
 
 	spin_lock_init(&pstapriv->sta_hash_lock);
 
 	/* _rtw_init_queue(&pstapriv->asoc_q); */
 	pstapriv->asoc_sta_count = 0;
-	INIT_LIST_HEAD(&pstapriv->sleep_q.queue);
-	spin_lock_init(&pstapriv->sleep_q.lock);
-	INIT_LIST_HEAD(&pstapriv->wakeup_q.queue);
-	spin_lock_init(&pstapriv->wakeup_q.lock);
+	_rtw_init_queue(&pstapriv->sleep_q);
+	_rtw_init_queue(&pstapriv->wakeup_q);
 
 	psta = (struct sta_info *)(pstapriv->pstainfo_buf);
 
@@ -246,8 +242,7 @@ struct	sta_info *rtw_alloc_stainfo(struct	sta_priv *pstapriv, u8 *hwaddr)
 			/* preorder_ctrl->wsize_b = (NR_RECVBUFF-2); */
 			preorder_ctrl->wsize_b = 64;/* 64; */
 
-			INIT_LIST_HEAD(&preorder_ctrl->pending_recvframe_queue.queue);
-			spin_lock_init(&preorder_ctrl->pending_recvframe_queue.lock);
+			_rtw_init_queue(&preorder_ctrl->pending_recvframe_queue);
 
 			rtw_init_recv_timer(preorder_ctrl);
 		}
@@ -268,6 +263,7 @@ exit:
 	return psta;
 }
 
+/*  using pstapriv->sta_hash_lock to protect */
 u32 rtw_free_stainfo(struct adapter *padapter, struct sta_info *psta)
 {
 	int i;
@@ -336,10 +332,8 @@ u32 rtw_free_stainfo(struct adapter *padapter, struct sta_info *psta)
 
 	spin_unlock_bh(&pxmitpriv->lock);
 
-	spin_lock_bh(&pstapriv->sta_hash_lock);
 	list_del_init(&psta->hash_list);
 	pstapriv->asoc_sta_count--;
-	spin_unlock_bh(&pstapriv->sta_hash_lock);
 
 	/*  re-init sta_info; 20061114 will be init in alloc_stainfo */
 	/* _rtw_init_sta_xmit_priv(&psta->sta_xmitpriv); */
@@ -434,7 +428,6 @@ void rtw_free_all_stainfo(struct adapter *padapter)
 	struct sta_info *psta = NULL;
 	struct	sta_priv *pstapriv = &padapter->stapriv;
 	struct sta_info *pbcmc_stainfo = rtw_get_bcmc_stainfo(padapter);
-	LIST_HEAD(stainfo_free_list);
 
 	if (pstapriv->asoc_sta_count == 1)
 		return;
@@ -447,16 +440,11 @@ void rtw_free_all_stainfo(struct adapter *padapter)
 			psta = list_entry(plist, struct sta_info, hash_list);
 
 			if (pbcmc_stainfo != psta)
-				list_move(&psta->hash_list, &stainfo_free_list);
+				rtw_free_stainfo(padapter, psta);
 		}
 	}
 
 	spin_unlock_bh(&pstapriv->sta_hash_lock);
-
-	list_for_each_safe(plist, tmp, &stainfo_free_list) {
-		psta = list_entry(plist, struct sta_info, hash_list);
-		rtw_free_stainfo(padapter, psta);
-	}
 }
 
 /* any station allocated can be searched by hash list */

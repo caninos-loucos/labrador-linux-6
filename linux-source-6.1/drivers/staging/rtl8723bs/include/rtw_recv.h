@@ -35,8 +35,6 @@
 
 #define MAX_SUBFRAME_COUNT	64
 
-#define LLC_HEADER_LENGTH	6
-
 /* for Rx reordering buffer control */
 struct recv_reorder_ctrl {
 	struct adapter	*padapter;
@@ -383,6 +381,17 @@ static inline u8 *get_rxmem(union recv_frame *precvframe)
 		return NULL;
 
 	return precvframe->u.hdr.rx_head;
+}
+
+static inline u8 *get_recvframe_data(union recv_frame *precvframe)
+{
+
+	/* alwasy return rx_data */
+	if (precvframe == NULL)
+		return NULL;
+
+	return precvframe->u.hdr.rx_data;
+
 }
 
 static inline u8 *recvframe_pull(union recv_frame *precvframe, signed int sz)

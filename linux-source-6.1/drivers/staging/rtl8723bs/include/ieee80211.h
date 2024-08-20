@@ -154,12 +154,20 @@ enum network_type {
 
 #define SUPPORTED_24G_NETTYPE_MSK (WIRELESS_11B | WIRELESS_11G | WIRELESS_11_24N)
 
-#define is_legacy_only(net_type)  ((net_type) == ((net_type) & (WIRELESS_11BG)))
+#define IsLegacyOnly(NetType)  ((NetType) == ((NetType) & (WIRELESS_11BG)))
 
-#define is_supported_24g(net_type) ((net_type) & SUPPORTED_24G_NETTYPE_MSK ? true : false)
+#define IsSupported24G(NetType) ((NetType) & SUPPORTED_24G_NETTYPE_MSK ? true : false)
 
-#define is_supported_tx_cck(net_type) (((net_type) & (WIRELESS_11B)) ? true : false)
-#define is_supported_ht(net_type) (((net_type) & (WIRELESS_11_24N)) ? true : false)
+#define IsEnableHWCCK(NetType) IsSupported24G(NetType)
+#define IsEnableHWOFDM(NetType) (((NetType) & (WIRELESS_11G|WIRELESS_11_24N)) ? true : false)
+
+#define IsSupportedRxCCK(NetType) IsEnableHWCCK(NetType)
+#define IsSupportedRxOFDM(NetType) IsEnableHWOFDM(NetType)
+#define IsSupportedRxHT(NetType) IsEnableHWOFDM(NetType)
+
+#define IsSupportedTxCCK(NetType) (((NetType) & (WIRELESS_11B)) ? true : false)
+#define IsSupportedTxOFDM(NetType) (((NetType) & (WIRELESS_11G) ? true : false)
+#define IsSupportedHT(NetType) (((NetType) & (WIRELESS_11_24N)) ? true : false)
 
 struct ieee_param {
 	u32 cmd;
@@ -172,7 +180,7 @@ struct ieee_param {
 		struct {
 			u32 len;
 			u8 reserved[32];
-			u8 data[];
+			u8 data[0];
 		} wpa_ie;
 	        struct{
 			int command;
@@ -185,7 +193,7 @@ struct ieee_param {
 			u8 idx;
 			u8 seq[8]; /* sequence counter (set: RX, get: TX) */
 			u16 key_len;
-			u8 key[];
+			u8 key[0];
 		} crypt;
 		struct {
 			u16 aid;
@@ -196,7 +204,7 @@ struct ieee_param {
 		} add_sta;
 		struct {
 			u8 reserved[2];/* for set max_num_sta */
-			u8 buf[];
+			u8 buf[0];
 		} bcn_ie;
 	} u;
 };
@@ -204,7 +212,7 @@ struct ieee_param {
 struct ieee_param_ex {
 	u32 cmd;
 	u8 sta_addr[ETH_ALEN];
-	u8 data[];
+	u8 data[0];
 };
 
 struct sta_data {
@@ -389,6 +397,30 @@ enum {
 	MGN_MCS5,
 	MGN_MCS6,
 	MGN_MCS7,
+	MGN_MCS8,
+	MGN_MCS9,
+	MGN_MCS10,
+	MGN_MCS11,
+	MGN_MCS12,
+	MGN_MCS13,
+	MGN_MCS14,
+	MGN_MCS15,
+	MGN_MCS16,
+	MGN_MCS17,
+	MGN_MCS18,
+	MGN_MCS19,
+	MGN_MCS20,
+	MGN_MCS21,
+	MGN_MCS22,
+	MGN_MCS23,
+	MGN_MCS24,
+	MGN_MCS25,
+	MGN_MCS26,
+	MGN_MCS27,
+	MGN_MCS28,
+	MGN_MCS29,
+	MGN_MCS30,
+	MGN_MCS31,
 	MGN_UNKNOWN
 };
 
@@ -746,6 +778,7 @@ int rtw_parse_wpa2_ie(u8 *wpa_ie, int wpa_ie_len, int *group_cipher, int *pairwi
 
 void rtw_get_sec_ie(u8 *in_ie, uint in_len, u8 *rsn_ie, u16 *rsn_len, u8 *wpa_ie, u16 *wpa_len);
 
+u8 rtw_is_wps_ie(u8 *ie_ptr, uint *wps_ielen);
 u8 *rtw_get_wps_ie(u8 *in_ie, uint in_len, u8 *wps_ie, uint *wps_ielen);
 u8 *rtw_get_wps_attr(u8 *wps_ie, uint wps_ielen, u16 target_attr_id, u8 *buf_attr, u32 *len_attr);
 u8 *rtw_get_wps_attr_content(u8 *wps_ie, uint wps_ielen, u16 target_attr_id, u8 *buf_content, uint *len_content);
@@ -778,7 +811,7 @@ void rtw_get_bcn_info(struct wlan_network *pnetwork);
 
 void rtw_macaddr_cfg(struct device *dev, u8 *mac_addr);
 
-u16 rtw_mcs_rate(u8 bw_40MHz, u8 short_GI, unsigned char *MCS_rate);
+u16 rtw_mcs_rate(u8 rf_type, u8 bw_40MHz, u8 short_GI, unsigned char *MCS_rate);
 
 int rtw_action_frame_parse(const u8 *frame, u32 frame_len, u8 *category, u8 *action);
 const char *action_public_str(u8 action);

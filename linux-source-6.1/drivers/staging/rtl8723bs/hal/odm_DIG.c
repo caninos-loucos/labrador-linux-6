@@ -7,6 +7,8 @@
 
 #include "odm_precomp.h"
 
+#define ADAPTIVITY_VERSION "5.0"
+
 void odm_NHMCounterStatisticsInit(void *pDM_VOID)
 {
 	struct dm_odm_t	*pDM_Odm = (struct dm_odm_t *)pDM_VOID;
@@ -302,11 +304,69 @@ void ODM_Write_DIG(void *pDM_VOID, u8 CurrentIGI)
 		/* 1 Set IGI value */
 		PHY_SetBBReg(pDM_Odm->Adapter, ODM_REG(IGI_A, pDM_Odm), ODM_BIT(IGI, pDM_Odm), CurrentIGI);
 
-		PHY_SetBBReg(pDM_Odm->Adapter, ODM_REG(IGI_B, pDM_Odm), ODM_BIT(IGI, pDM_Odm), CurrentIGI);
+		if (pDM_Odm->RFType > ODM_1T1R)
+			PHY_SetBBReg(pDM_Odm->Adapter, ODM_REG(IGI_B, pDM_Odm), ODM_BIT(IGI, pDM_Odm), CurrentIGI);
 
 		pDM_DigTable->CurIGValue = CurrentIGI;
 	}
 
+}
+
+void odm_PauseDIG(
+	void *pDM_VOID,
+	enum ODM_Pause_DIG_TYPE PauseType,
+	u8 IGIValue
+)
+{
+	struct dm_odm_t *pDM_Odm = (struct dm_odm_t *)pDM_VOID;
+	struct dig_t *pDM_DigTable = &pDM_Odm->DM_DigTable;
+	static bool bPaused;
+
+	if (
+		(pDM_Odm->SupportAbility & ODM_BB_ADAPTIVITY) &&
+		pDM_Odm->TxHangFlg == true
+	) {
+		return;
+	}
+
+	if (
+		!bPaused && (!(pDM_Odm->SupportAbility & ODM_BB_DIG) ||
+		!(pDM_Odm->SupportAbility & ODM_BB_FA_CNT))
+	){
+		return;
+	}
+
+	switch (PauseType) {
+	/* 1 Pause DIG */
+	case ODM_PAUSE_DIG:
+		/* 2 Disable DIG */
+		ODM_CmnInfoUpdate(pDM_Odm, ODM_CMNINFO_ABILITY, pDM_Odm->SupportAbility & (~ODM_BB_DIG));
+
+		/* 2 Backup IGI value */
+		if (!bPaused) {
+			pDM_DigTable->IGIBackup = pDM_DigTable->CurIGValue;
+			bPaused = true;
+		}
+
+		/* 2 Write new IGI value */
+		ODM_Write_DIG(pDM_Odm, IGIValue);
+		break;
+
+	/* 1 Resume DIG */
+	case ODM_RESUME_DIG:
+		if (bPaused) {
+			/* 2 Write backup IGI value */
+			ODM_Write_DIG(pDM_Odm, pDM_DigTable->IGIBackup);
+			bPaused = false;
+
+			/* 2 Enable DIG */
+			ODM_CmnInfoUpdate(pDM_Odm, ODM_CMNINFO_ABILITY, pDM_Odm->SupportAbility | ODM_BB_DIG);
+		}
+		break;
+
+	default:
+		break;
+	}
 }
 
 bool odm_DigAbort(void *pDM_VOID)
@@ -487,7 +547,7 @@ void odm_DIG(void *pDM_VOID)
 	/* 1 Adjust initial gain by false alarm */
 	if (pDM_Odm->bLinked && bPerformance) {
 
-		if (bFirstTpTarget || FirstConnect) {
+		if (bFirstTpTarget || (FirstConnect && bPerformance)) {
 			pDM_DigTable->LargeFAHit = 0;
 
 			if (pDM_Odm->RSSI_Min < DIG_MaxOfMin) {

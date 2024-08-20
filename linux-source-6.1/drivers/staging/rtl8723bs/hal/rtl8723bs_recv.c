@@ -4,6 +4,7 @@
  * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
  *
  ******************************************************************************/
+#define _RTL8723BS_RECV_C_
 
 #include <drv_types.h>
 #include <rtw_debug.h>
@@ -81,7 +82,7 @@ static void update_recvframe_phyinfo(union recv_frame *precvframe,
 	struct odm_phy_info *p_phy_info =
 		(struct odm_phy_info *)(&pattrib->phy_info);
 
-	u8 *wlanhdr = precvframe->u.hdr.rx_data;
+	u8 *wlanhdr;
 	u8 *my_bssid;
 	u8 *rx_bssid;
 	u8 *rx_ra;
@@ -100,6 +101,7 @@ static void update_recvframe_phyinfo(union recv_frame *precvframe,
 	struct sta_priv *pstapriv;
 	struct sta_info *psta;
 
+	wlanhdr = get_recvframe_data(precvframe);
 	my_bssid = get_bssid(&padapter->mlmepriv);
 	rx_bssid = get_hdr_bssid(wlanhdr);
 	pkt_info.bssid_match = ((!IsFrameTypeCtrl(wlanhdr)) &&
@@ -128,7 +130,7 @@ static void update_recvframe_phyinfo(union recv_frame *precvframe,
 
 	/* rtl8723b_query_rx_phy_status(precvframe, pphy_status); */
 	/* spin_lock_bh(&p_hal_data->odm_stainfo_lock); */
-	odm_phy_status_query(&p_hal_data->odmpriv, p_phy_info,
+	ODM_PhyStatusQuery(&p_hal_data->odmpriv, p_phy_info,
 			   (u8 *)pphy_status, &(pkt_info));
 	if (psta)
 		psta->rssi = pattrib->phy_info.RecvSignalPower;
@@ -377,10 +379,8 @@ s32 rtl8723bs_init_recv_priv(struct adapter *padapter)
 	precvpriv = &padapter->recvpriv;
 
 	/* 3 1. init recv buffer */
-	INIT_LIST_HEAD(&precvpriv->free_recv_buf_queue.queue);
-	spin_lock_init(&precvpriv->free_recv_buf_queue.lock);
-	INIT_LIST_HEAD(&precvpriv->recv_buf_pending_queue.queue);
-	spin_lock_init(&precvpriv->recv_buf_pending_queue.lock);
+	_rtw_init_queue(&precvpriv->free_recv_buf_queue);
+	_rtw_init_queue(&precvpriv->recv_buf_pending_queue);
 
 	n = NR_RECVBUFF * sizeof(struct recv_buf) + 4;
 	precvpriv->pallocated_recv_buf = rtw_zmalloc(n);
