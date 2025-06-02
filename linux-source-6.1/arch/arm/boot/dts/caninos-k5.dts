@@ -377,6 +377,8 @@
 			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst RST_UART2>;
 			reset-names = "uart";
+			clocks = <&cmu CLK_UART2>;
+			clock-names = "uart";
 			status = "okay";
 			
 			pinctrl-names = "default";
