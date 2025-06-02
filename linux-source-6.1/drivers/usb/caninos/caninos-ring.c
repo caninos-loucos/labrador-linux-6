@@ -4,112 +4,13 @@
 #include <linux/dma-mapping.h>
 
 #include "aotg_hcd.h"
-#include "aotg_hcd_debug.h"
-#include "aotg.h"
 
 void aotg_set_ring_linkaddr(struct aotg_ring *ring, u32 addr);
 int aotg_set_trb_as_ring_linkaddr(struct aotg_ring *ring, struct aotg_trb *trb);
-u32 ring_trb_virt_to_dma(struct aotg_ring *ring, struct aotg_trb *trb_vaddr);
+
 void clear_ring_irq(struct aotg_hcd *acthcd, unsigned int irq_mask);
 
-void aotg_dump_linklist_reg_2(struct aotg_hcd *acthcd, int dmanr)
-{
-	int is_out, index, index_multi;
 
-	is_out = (dmanr & AOTG_DMA_OUT_PREFIX) ? 1 : 0;
-	index = dmanr & 0xf;
-	if (index >= 1) {
-		index_multi = index - 1;
-	} else {
-		ACT_HCD_ERR
-		return;
-	}
-
-	pr_info("--------- dma reg, ep%d-%s-------\n", index,
-			is_out ? "out" : "in");
-
-	pr_info("HCDMABCKDOOR(0x%p) : 0x%x\n",
-		acthcd->base + HCDMABCKDOOR, readl(acthcd->base + HCDMABCKDOOR));
-	pr_info("HCDMAxOVERFLOWIRQ(0x%p) : 0x%x\n",
-		acthcd->base + HCDMAxOVERFLOWIRQ, readl(acthcd->base + HCDMAxOVERFLOWIRQ));
-	pr_info("HCDMAxOVERFLOWIEN(0x%p) : 0x%x\n",
-		acthcd->base + HCDMAxOVERFLOWIEN, readl(acthcd->base + HCDMAxOVERFLOWIEN));
-
-	if (is_out) {
-		pr_info("HCOUT%dDMALINKADDR(0x%p) : 0x%x\n", index,
-			acthcd->base + HCOUT1DMALINKADDR + index_multi * 0x10,
-			readl(acthcd->base + HCOUT1DMALINKADDR + index_multi * 0x10));
-		pr_info("HCOUT%dDMACURADDR(0x%p) : 0x%x\n", index,
-			acthcd->base + HCOUT1DMACURADDR + index_multi * 0x10,
-			readl(acthcd->base + HCOUT1DMACURADDR + index_multi * 0x10));
-		pr_info("HCOUT%dDMACTRL(0x%p) : 0x%x\n", index,
-			acthcd->base + HCOUT1DMACTRL + index_multi * 0x10,
-			readl(acthcd->base + HCOUT1DMACTRL + index_multi * 0x10));
-		pr_info("HCOUT%dDMACOMPLETECNT(0x%p) : 0x%x\n", index,
-			acthcd->base + HCOUT1DMACOMPLETECNT + index_multi * 0x10,
-			readl(acthcd->base + HCOUT1DMACOMPLETECNT + index_multi * 0x10));
-	} else {
-		pr_info("HCIN%dDMALINKADDR(0x%p) : 0x%x\n", index,
-			acthcd->base + HCIN1DMALINKADDR + index_multi * 0x10,
-			readl(acthcd->base + HCIN1DMALINKADDR + index_multi * 0x10));
-		pr_info("HCIN%dDMACURADDR(0x%p) : 0x%x\n", index,
-			acthcd->base + HCIN1DMACURADDR + index_multi * 0x10,
-			readl(acthcd->base + HCIN1DMACURADDR + index_multi * 0x10));
-		pr_info("HCIN%dDMACTRL(0x%p) : 0x%x\n", index,
-			acthcd->base + HCIN1DMACTRL + index_multi * 0x10,
-			readl(acthcd->base + HCIN1DMACTRL + index_multi * 0x10));
-		pr_info("HCIN%dDMACOMPLETECNT(0x%p) : 0x%x\n", index,
-			acthcd->base + HCIN1DMACOMPLETECNT + index_multi * 0x10,
-			readl(acthcd->base + HCIN1DMACOMPLETECNT + index_multi * 0x10));
-	}
-}
-
-static void aotg_hcd_dump_trb(struct aotg_ring *ring, struct aotg_trb *trb)
-{
-	pr_info("trb:0x%p, dma:0x%x\n", trb, (u32)ring_trb_virt_to_dma(ring, trb));
-	pr_info("hw_buf_ptr : 0x%x\n", trb->hw_buf_ptr);
-	pr_info("hw_buf_len : %d\n", trb->hw_buf_len);
-	pr_info("hw_buf_remain : %d\n", trb->hw_buf_remain);
-	pr_info("hw_token : 0x%x\n", trb->hw_token);
-}
-
-void aotg_hcd_dump_td(struct aotg_ring *ring, struct aotg_td *td)
-{
-	int i, j;
-	int num_trbs;
-	struct aotg_trb *trb;
-
-	if (td == NULL) {
-		ACT_HCD_ERR
-		return;
-	}
-
-	num_trbs = td->num_trbs;
-	trb = td->trb_vaddr;
-
-	pr_info("==== dump td: %d trbs ====\n", td->num_trbs);
-
-	if (trb + num_trbs > ring->last_trb) {
-		for (i = 0; trb + i < ring->last_trb + 1; i++) {
-			pr_warn("trb_%d:\n", i);
-			aotg_hcd_dump_trb(ring, trb + i);
-		}
-		trb = ring->first_trb;
-		j = 0;
-		for (; i < num_trbs; i++) {
-			pr_info("trb_%d:\n", i);
-			aotg_hcd_dump_trb(ring, trb + j);
-			j++;
-		}
-	} else {
-		for (i = 0; i < num_trbs; i++) {
-			pr_info("trb_%d:\n", i);
-			aotg_hcd_dump_trb(ring, trb + i);
-		}
-	}
-	pr_info("\n");
-	return;
-}
 
 void inc_dequeue_safe(struct aotg_ring *ring)
 {
@@ -125,25 +26,34 @@ void inc_dequeue_safe(struct aotg_ring *ring)
 struct aotg_ring *aotg_alloc_ring(struct aotg_hcd *acthcd,
 	struct aotg_hcep *ep, unsigned int num_trbs, gfp_t mem_flags)
 {
-	dma_addr_t	dma;
+	dma_addr_t dma;
 	struct device *dev = aotg_to_hcd(acthcd)->self.controller;
 	struct aotg_ring *ring;
-
+	
 	ring = kmalloc(sizeof(struct aotg_ring), mem_flags);
-	if (!ring)
+	
+	if (!ring) {
 		return NULL;
-
+	}
+	
 	ring->num_trbs = num_trbs;
+	
 	if (num_trbs == 0) {
-		ACT_HCD_DBG
 		return ring;
 	}
-
+	
 	ring->first_trb = (struct aotg_trb *)
-		dma_alloc_coherent(dev,	num_trbs * sizeof(struct aotg_trb), &dma, mem_flags);
-
-	HUB_DEBUG("frist_trb:%x,dma:%x\n", ring->first_trb, dma);
+		dma_alloc_coherent(dev, num_trbs * sizeof(struct aotg_trb), &dma, mem_flags);
+	
+	if (!ring->first_trb)
+	{
+		kfree(ring);
+		return NULL;
+	}
+	
+	
 	memset(ring->first_trb, 0, num_trbs * sizeof(struct aotg_trb));
+	
 	ring->trb_dma = (u32)dma;
 	ring->last_trb = ring->first_trb + num_trbs - 1;
 	ring->ring_trb = ring->last_trb;
@@ -172,12 +82,6 @@ struct aotg_ring *aotg_alloc_ring(struct aotg_hcd *acthcd,
 		acthcd->base + HCOUT1DMACOMPLETECNT,
 		acthcd->base + HCIN1DMACOMPLETECNT, ep->index);
 
-	/*pr_warn("=====================================\n");
-	pr_warn("first_trb:0x%x,last_trb:0x%x, ring_trb:0x%x\n",
-			(u32)(ring->first_trb), (u32)(ring->last_trb), (u32)(ring->ring_trb));
-	pr_warn("enq_trb:0x%x, deq_trb:0x%x\n",
-			(u32)(ring->enqueue_trb), (u32)(ring->dequeue_trb));
-	pr_warn("=====================================\n");*/
 	return ring;
 }
 
@@ -241,42 +145,14 @@ void overflow_irq_handler(struct aotg_hcd *acthcd, struct aotg_hcep *ep)
 	struct aotg_ring *ring;
 
 	if (!ep) {
-		pr_warn("%s, ep%d is NULL!\n", __func__, ep->index);
+		dev_info(acthcd->dev, "%s, ep%d is NULL!\n", __func__, ep->index);
 		return;
 	}
 	ring = ep->ring;
 
 	return;
 }
-/*
-void aotg_handle_overflow_irq(struct aotg_hcd *acthcd)
-{
-	int i;
-	unsigned int irq_pend = 0;
-	struct aotg_hcep *ep;
 
-	irq_pend = readl(acthcd->base + HCDMAxOVERFLOWIRQ);
-
-	if (irq_pend & RING_IN_OF) {
-		for (i = 1; i < 16; i++) {
-			if (irq_pend & (0x1 << i)) {
-				ep = acthcd->inep[i];
-				overflow_irq_handler(acthcd, ep);
-			}
-		}
-	}
-
-	if (irq_pend & RING_OUT_OF) {
-		for (i = 1; i < 16; i++) {
-			if (irq_pend & (0x1 << (i + 16))) {
-				ep = acthcd->outep[i];
-				overflow_irq_handler(acthcd, ep);
-			}
-	}
-
-	writel(irq_pend, acthcd->base + HCDMAxOVERFLOWIRQ);
-}
-*/
 int is_ring_running(struct aotg_ring *ring)
 {
 	return (readl(ring->reg_dmactrl) & 0x1) ? 1 : 0;
@@ -323,24 +199,23 @@ void aotg_stop_ring(struct aotg_hcd *acthcd, struct aotg_hcep *ep)
 	writel(DMACTRL_DMACC, ep->ring->reg_dmactrl);
 	usb_clearbitsb(0x80, ep->reg_hcepcon);
 	usb_settoggle(ep->udev, ep->epnum, ep->is_out, 0);
-	aotg_hcep_reset(acthcd, ep->mask, ENDPRST_FIFORST);
+	ep_reset(acthcd, ep->mask, ENDPRST_FIFORST);
 	writeb(ep->epnum, ep->reg_hcepctrl);
 	usb_setbitsb(0x80, ep->reg_hcepcon);
 }
 #endif
 
-u32 ring_trb_virt_to_dma(struct aotg_ring *ring,
-	struct aotg_trb *trb_vaddr)
+u32 ring_trb_virt_to_dma(struct aotg_ring *ring, struct aotg_trb *trb_vaddr)
 {
 	u32 addr;
 	unsigned long offset;
-
+	
 	if (!ring || !trb_vaddr)
 		return 0;
-
+	
 	if (trb_vaddr > ring->last_trb)
 		return 0;
-
+	
 	offset = trb_vaddr - ring->first_trb;
 	addr = ring->trb_dma + (offset * sizeof(*trb_vaddr));
 	return addr;
@@ -349,7 +224,7 @@ u32 ring_trb_virt_to_dma(struct aotg_ring *ring,
 void aotg_set_ring_linkaddr(struct aotg_ring *ring, u32 addr)
 {
 	if (!ring) {
-		ACT_HCD_ERR
+		
 		return;
 	}
 	writel(addr, ring->reg_dmalinkaddr);
@@ -361,7 +236,7 @@ int aotg_set_trb_as_ring_linkaddr(struct aotg_ring *ring, struct aotg_trb *trb)
 
 	addr = (u32)ring_trb_virt_to_dma(ring, trb);
 	if (!addr) {
-		ACT_HCD_ERR
+		
 		return -1;
 	}
 
@@ -384,22 +259,11 @@ inline int is_room_on_ring(struct aotg_ring *ring, unsigned int num_trbs)
 	return (num_trbs > atomic_read(&ring->num_trbs_free)) ? 0 : 1;
 }
 
-inline unsigned int	count_urb_need_trbs(struct urb *urb)
-{
-	int num_trbs;
-
-	num_trbs = 1;
-	if (usb_pipeout(urb->pipe) && (urb->transfer_flags & URB_ZERO_PACKET))
-		num_trbs++;
-
-	return num_trbs;
-}
-
 /**
  * scatter-gather transfer trbs count.
  * according to num_sgs and urb->transfer_buffer_length.
  */
-inline unsigned int	count_sg_urb_need_trbs(struct urb *urb)
+inline unsigned int count_sg_urb_need_trbs(struct urb *urb)
 {
 	int num_sgs, num_trbs, temp, i;
 	struct scatterlist *sg;
@@ -433,8 +297,6 @@ void aotg_fill_trb(struct aotg_trb *trb, u32 dma_addr, u32 len, u32 token)
 	trb->hw_buf_len = len;
 	trb->hw_token = token;
 
-	ACT_LINKLIST_DMA_DEBUG("hw_ptr(0x%x), hw_len(%d),hw_token(0x%x)\n",
-		trb->hw_buf_ptr, trb->hw_buf_len, trb->hw_token);
 	return;
 }
 
@@ -452,46 +314,27 @@ int aotg_sg_map_trb(struct aotg_trb *trb,
 
 	return this_trb_len;
 }
-#if (0)
-/*
- * ring->enqueue_trb should be overflow
- */
-void inc_enqueue_safe(struct aotg_ring *ring)
-{
-	atomic_dec(&ring->num_trbs_free);
-	if (ring->enqueue_trb == ring->ring_trb) {
-		if (ring->type == PIPE_BULK) {
-			ring->enqueue_trb->hw_token &= ~TRB_CHN;
-			if (ring->is_out)
-				ring->enqueue_trb->hw_token |= TRB_ITE | TRB_LT;
-			else
-				ring->enqueue_trb->hw_token |= TRB_ICE | TRB_LT;
-			ring->enqueue_trb = ring->first_trb;
-		} else {
-			ring->enqueue_trb->hw_token |= TRB_COF;
-			ring->enqueue_trb = ring->first_trb;
-		}
-	} else {
-		ring->enqueue_trb += 1;
-	}
-}
-#endif
-void enqueue_trb(struct aotg_ring *ring, u32 buf_ptr, u32 buf_len,
-	u32 token)
+
+
+void enqueue_trb(struct aotg_ring *ring, u32 buf_ptr, u32 buf_len, u32 token)
 {
 	struct aotg_trb *trb;
 	trb = ring->enqueue_trb;
 
 	atomic_dec(&ring->num_trbs_free);
-	if (trb == ring->last_trb) {
-		if (ring->type == PIPE_BULK) {
+	
+	if (trb == ring->last_trb)
+	{
+		if (ring->type == PIPE_BULK)
+		{
 			token &= ~TRB_CHN;
 			if (ring->is_out)
 				token |= TRB_ITE | TRB_LT;
 			else
 				token |= TRB_ICE | TRB_LT;
 			ring->enqueue_trb = ring->first_trb;
-		} else {
+		}
+		else {
 			token |= TRB_COF;
 			ring->enqueue_trb = ring->first_trb;
 		}
@@ -504,129 +347,6 @@ void enqueue_trb(struct aotg_ring *ring, u32 buf_ptr, u32 buf_len,
 	trb->hw_buf_remain = 0;
 	wmb();
 	trb->hw_token = token;
-}
-
-/*
- * ensure ring has enough room for this td
- * before call this function.
- */
-int ring_enqueue_sg_td(struct aotg_hcd *acthcd,
-	struct aotg_ring *ring, struct aotg_td *td)
-{
-	u8 is_out;
-	int num_sgs, num_trbs;
-	int len, this_trb_len;
-	u32 addr, token;
-	struct urb *urb = td->urb;
-	struct scatterlist *sg;
-
-	is_out = usb_pipeout(urb->pipe);
-	len = urb->transfer_buffer_length;
-	num_sgs = urb->num_mapped_sgs;
-	num_trbs = count_sg_urb_need_trbs(urb);
-	if (!is_room_on_ring(ring, num_trbs))
-		return -1;
-
-	td->num_trbs = num_trbs;
-	td->trb_vaddr = ring->enqueue_trb;
-	td->trb_dma = ring_trb_virt_to_dma(ring, ring->enqueue_trb);
-
-	if (td->trb_vaddr + (num_trbs - 1) > ring->last_trb)
-		td->cross_ring = 1;
-
-	sg = urb->sg;
-	addr = (u32)sg_dma_address(sg);
-	this_trb_len = (u32)min_t(int, sg_dma_len(sg), len);
-
-	if (is_out)
-		token = TRB_OF;
-	else
-		token = TRB_CSP | TRB_OF;
-
-	do {
-		if (num_trbs == 1) {
-			token &= ~TRB_CHN;
-			if (is_out)
-				token |= TRB_ITE;
-			else
-				token |= TRB_ICE;
-
-			if (is_out && (urb->transfer_flags & URB_ZERO_PACKET))
-				enqueue_trb(ring, 0, 0, token);
-			else
-				enqueue_trb(ring, addr, this_trb_len, token);
-			break;
-		}
-		token |= TRB_CHN;
-		enqueue_trb(ring, addr, this_trb_len, token);
-		len -= this_trb_len;
-		num_trbs--;
-		num_sgs--;
-
-		if (num_sgs) {
-			sg = sg_next(sg);
-			addr = (u32)sg_dma_address(sg);
-			this_trb_len = (u32)min_t(int, sg_dma_len(sg), len);
-		}
-	} while (num_trbs);
-
-	return 0;
-}
-
-int aotg_ring_enqueue_td(struct aotg_hcd *acthcd,
-	struct aotg_ring *ring, struct aotg_td *td)
-{
-	u8 is_out;
-	u32 addr, token, this_trb_len;
-	int num_trbs;
-	struct urb *urb = td->urb;
-
-	if (!acthcd || !td || !ring || !urb) {
-		ACT_HCD_ERR
-		return -1;
-	}
-
-	if (urb->num_sgs)
-		return ring_enqueue_sg_td(acthcd, ring, td);
-
-	num_trbs = count_urb_need_trbs(urb);
-	if (!is_room_on_ring(ring, num_trbs))
-		return -1;
-
-	is_out = usb_pipeout(urb->pipe);
-
-	td->num_trbs = num_trbs;
-	td->trb_vaddr = ring->enqueue_trb;
-	td->trb_dma = ring_trb_virt_to_dma(ring, ring->enqueue_trb);
-
-	addr = (u32)urb->transfer_dma;
-	this_trb_len = (u32)urb->transfer_buffer_length;
-
-	if (is_out)
-		token = TRB_OF;
-	else
-		token = TRB_CSP | TRB_OF;
-
-	/*
-	 * Finish bulk OUT with short packet
-	 */
-	if (num_trbs > 1) {
-		token |= TRB_CHN;
-		enqueue_trb(ring, addr, this_trb_len, token);
-		addr = 0;
-		this_trb_len = 0;
-	}
-
-	token &= ~TRB_CHN;
-
-		token |= TRB_LT; /*8723bu,release cpu for interrupt transfer*/
-	if (is_out)
-		token |= TRB_ITE;
-	else
-		token |= TRB_ICE;
-
-	enqueue_trb(ring, addr, this_trb_len, token);
-	return 0;
 }
 
 void aotg_reorder_intr_td(struct aotg_hcep *ep)
@@ -674,8 +394,10 @@ void aotg_reorder_iso_td(struct aotg_hcd *acthcd, struct aotg_ring *ring)
 	new_trb_q = (struct aotg_trb *)
 		dma_alloc_coherent(dev,	NUM_TRBS * sizeof(struct aotg_trb),
 		&dma, GFP_ATOMIC);
-	if (!new_trb_q) {
-		pr_err("dma_alloc_coherent trb error!!!\n");
+	
+	if (!new_trb_q)
+	{
+		dev_err(acthcd->dev, "dma_alloc_coherent trb error!!!\n");
 		return;
 	}
 	memset(new_trb_q, 0, NUM_TRBS * sizeof(struct aotg_trb));
@@ -702,64 +424,69 @@ void aotg_reorder_iso_td(struct aotg_hcd *acthcd, struct aotg_ring *ring)
 	dma_free_coherent(dev, NUM_TRBS * sizeof(struct aotg_trb), prev_trb_q, prev_dma);
 }
 
-int aotg_ring_enqueue_intr_td(struct aotg_hcd *acthcd, struct aotg_ring *ring,
-	struct aotg_hcep *ep, struct urb *urb, gfp_t mem_flags)
+int aotg_ring_enqueue_intr_td(
+	struct aotg_hcd *acthcd, struct aotg_hcep *ep,
+	struct urb *urb, gfp_t mem_flags)
 {
 	u8 is_out;
 	u32 addr, token, this_trb_len;
 	int i;
 	int mem_size;
-	dma_addr_t	dma;
+	dma_addr_t dma;
 	struct aotg_td *td, *next;
 	struct device *dev = aotg_to_hcd(acthcd)->self.controller;
+	struct aotg_ring *ring = ep->ring;
 
 	if (!is_room_on_ring(ring, INTR_TRBS)) {
-		pr_warn("%s err, check it!\n", __func__);
-		return -1;
+		return -ENOMEM;
 	}
 
 	is_out = usb_pipeout(urb->pipe);
 	mem_size = urb->transfer_buffer_length;
 	
 	ring->intr_mem_size = mem_size;
-	ring->intr_dma_buf_vaddr = (u8 *)dma_alloc_coherent(dev, mem_size * INTR_TRBS,&dma, mem_flags);
-	
-	
+	ring->intr_dma_buf_vaddr = (u8 *)dma_alloc_coherent(
+		dev, mem_size * INTR_TRBS, &dma, mem_flags);
 	
 	if (!ring->intr_dma_buf_vaddr) {
-		pr_err("%s err, alloc dma buf for intr fail!\n", __func__);
-		return -1;
+		return -ENOMEM;
 	}
+	
 	ring->intr_dma_buf_phyaddr = dma;
 
-	for (i = 0; i < INTR_TRBS; i++) {
+	for (i = 0; i < INTR_TRBS; i++)
+	{
 		td = aotg_alloc_td(mem_flags);
+		
 		if (!td) {
-			pr_err("%s err, alloc td fail\n", __func__);
 			goto fail;
 		}
+		
 		td->intr_mem_vaddr = ring->intr_dma_buf_vaddr + mem_size * i;
 		td->intr_men_phyaddr = ring->intr_dma_buf_phyaddr + mem_size * i;
+		
 		memset(td->intr_mem_vaddr, 0, mem_size);
-
+		
 		td->num_trbs = 1;
 		td->trb_vaddr = ring->enqueue_trb;
 		td->trb_dma = ring_trb_virt_to_dma(ring, ring->enqueue_trb);
-
+		
 		this_trb_len = mem_size;
+		
 		if (is_out) {
 			token = TRB_OF | TRB_ITE | TRB_LT;
 			enqueue_trb(ring, urb->transfer_dma, this_trb_len, token);
-		}	else {
+		}
+		else {
 			token = TRB_OF | TRB_ICE | TRB_CSP;
 			addr = (u32)td->intr_men_phyaddr;
 			enqueue_trb(ring, addr, this_trb_len, token);
 		}
-
+		
 		list_add_tail(&td->enring_list, &ep->enring_td_list);
 		ring->enring_cnt++;
 	}
-
+	
 	ring->intr_inited = 1;
 	return 0;
 
@@ -771,7 +498,7 @@ fail:
 	dma_free_coherent(dev, ring->intr_mem_size * INTR_TRBS,
 		ring->intr_dma_buf_vaddr, ring->intr_dma_buf_phyaddr);
 
-	return -1;
+	return -ENOMEM;
 }
 
 int aotg_intr_get_finish_trb(struct aotg_ring *ring)
@@ -790,7 +517,7 @@ int aotg_intr_get_finish_trb(struct aotg_ring *ring)
 int aotg_intr_chg_buf_len(struct aotg_hcd *acthcd, struct aotg_ring *ring, int len)
 {
 	struct aotg_td *td;
-	dma_addr_t	dma;
+	dma_addr_t dma;
 	int i = 0;
 	u32 token;
 	struct aotg_hcep *ep = (struct aotg_hcep *)ring->priv;
@@ -799,7 +526,7 @@ int aotg_intr_chg_buf_len(struct aotg_hcd *acthcd, struct aotg_ring *ring, int l
 	writel(DMACTRL_DMACC, ring->reg_dmactrl);
 	usb_clearbitsb(0x80, ep->reg_hcepcon);
 	usb_settoggle(ep->udev, ep->epnum, ep->is_out, 0);
-	aotg_hcep_reset(acthcd, ep->mask, ENDPRST_FIFORST);
+	ep_reset(acthcd, ep->mask, ENDPRST_FIFORST);
 	writeb(ep->epnum, ep->reg_hcepctrl);
 	usb_setbitsb(0x80, ep->reg_hcepcon);
 
@@ -807,11 +534,12 @@ int aotg_intr_chg_buf_len(struct aotg_hcd *acthcd, struct aotg_ring *ring, int l
 		ring->intr_dma_buf_vaddr, ring->intr_dma_buf_phyaddr);
 
 	ring->intr_mem_size = len;
-	ring->intr_dma_buf_vaddr = (u8 *)dma_alloc_coherent(dev, len * INTR_TRBS,
-		&dma, GFP_ATOMIC);
+	ring->intr_dma_buf_vaddr = (u8 *)dma_alloc_coherent(
+		dev, len * INTR_TRBS,&dma, GFP_ATOMIC);
+	
 	if (!ring->intr_dma_buf_vaddr) {
-		pr_err("%s err, alloc dma buf for intr fail!\n", __func__);
-		return -1;
+		dev_err(acthcd->dev, "%s err, alloc dma buf for intr fail!\n", __func__);
+		return -ENOMEM;
 	}
 	ring->intr_dma_buf_phyaddr = dma;
 
@@ -849,70 +577,7 @@ void aotg_intr_dma_buf_free(struct aotg_hcd *acthcd, struct aotg_ring *ring)
 		ring->intr_dma_buf_vaddr, ring->intr_dma_buf_phyaddr);
 }
 
-int aotg_ring_enqueue_isoc_td(struct aotg_hcd *acthcd,
-	struct aotg_ring *ring, struct aotg_td *td)
-{
-	u8 is_out;
-	u32 start_addr;
-	u32 addr, token, this_trb_len;
-	int i = 0;
-	int start_frame;
-	int num_trbs;
-	struct urb *urb = td->urb;
 
-	if (!acthcd || !td || !ring || !urb) {
-		ACT_HCD_ERR
-		return -1;
-	}
-
-	num_trbs = urb->number_of_packets;
-	if (unlikely(num_trbs == 0)) {
-		ACT_HCD_ERR
-		return -1;
-	}
-
-	if (unlikely(!is_room_on_ring(ring, num_trbs))) {
-		ACT_HCD_DBG
-		return -1;
-	}
-
-	is_out = usb_pipeout(urb->pipe);
-
-	td->num_trbs = num_trbs;
-	td->trb_vaddr = ring->enqueue_trb;
-	td->trb_dma = ring_trb_virt_to_dma(ring, ring->enqueue_trb);
-
-	start_frame = readw(acthcd->base + HCFRMNRL);
-	start_frame &= 0x3fff;
-	urb->start_frame = start_frame;
-
-	start_addr = (u32)urb->transfer_dma;
-
-	if (is_out)
-		token = TRB_OF;
-	else
-		token = TRB_CSP | TRB_OF;
-
-	do {
-		addr = start_addr + urb->iso_frame_desc[i].offset;
-		this_trb_len = urb->iso_frame_desc[i].length;
-		if (num_trbs == 1) {
-			token &= ~TRB_CHN;
-			if (is_out)
-				token |= TRB_ITE;
-			else
-				token |= TRB_ICE;
-
-			enqueue_trb(ring, addr, this_trb_len, token);
-			break;
-		}
-		enqueue_trb(ring, addr, this_trb_len, token);
-		i++;
-		num_trbs--;
-	} while (num_trbs);
-
-	return 0;
-}
 
 void dequeue_td(struct aotg_ring *ring, struct aotg_td *td, int dequeue_flag)
 {
@@ -920,7 +585,7 @@ void dequeue_td(struct aotg_ring *ring, struct aotg_td *td, int dequeue_flag)
 	struct aotg_trb *trb;
 
 	if (!ring || !td || ((struct list_head *)(&td->enring_list)->next == LIST_POISON1)) {
-		ACT_HCD_ERR
+		
 		return;
 	}
 	trb = td->trb_vaddr;
@@ -953,7 +618,7 @@ void dequeue_intr_td(struct aotg_ring *ring, struct aotg_td *td)
 	struct aotg_hcep *ep;
 
 	if (!ring || !td) {
-		ACT_HCD_ERR
+		
 		return;
 	}
 
@@ -997,8 +662,8 @@ int aotg_ring_dequeue_intr_td(struct aotg_hcd *acthcd, struct aotg_hcep *ep,
 
 	td_tmp = list_first_entry_or_null(&ep->enring_td_list, struct aotg_td, enring_list);
 	if ((td_tmp) && (td_tmp->urb)) {
-		pr_warn("%s, unormal circumstances, pls check it...\n", __func__);
-		pr_warn("restart ep%d intr ring\n", ep->index);
+		dev_err(acthcd->dev, "%s, unormal circumstances, pls check it...\n", __func__);
+		dev_err(acthcd->dev, "restart ep%d intr ring\n", ep->index);
 		addr = ring_trb_virt_to_dma(ring, ring->dequeue_trb);
 		aotg_start_ring(ring, addr);
 	}
@@ -1028,7 +693,7 @@ int aotg_ring_dequeue_td(struct aotg_hcd *acthcd, struct aotg_ring *ring,
 		writel(DMACTRL_DMACC, ep->ring->reg_dmactrl);
 		usb_clearbitsb(0x80, ep->reg_hcepcon);
 		usb_settoggle(ep->udev, ep->epnum, ep->is_out, 0);
-		aotg_hcep_reset(acthcd, ep->mask, ENDPRST_FIFORST);
+		ep_reset(acthcd, ep->mask, ENDPRST_FIFORST);
 		writeb(ep->epnum, ep->reg_hcepctrl);
 		usb_setbitsb(0x80, ep->reg_hcepcon);
 		/*
@@ -1037,7 +702,7 @@ int aotg_ring_dequeue_td(struct aotg_hcd *acthcd, struct aotg_ring *ring,
 		index = ring->mask & 0xf;
 		if ((0x1 << index) & (readw(acthcd->base + HCINxDMAIRQ0)) ||
 			(0x1 << index) & (readw(acthcd->base + HCOUTxBUFEMPTYIRQ0))) {
-			pr_warn("noticd:%s, IN%dIRQ:0x%x; OUT%dIRQ:0x%x\n",
+			dev_info(acthcd->dev, "noticd:%s, IN%dIRQ:0x%x; OUT%dIRQ:0x%x\n",
 				__func__, index, readw(acthcd->base + HCINxDMAIRQ0),
 				index, readw(acthcd->base + HCOUTxBUFEMPTYIRQ0));
 			clear_ring_irq(acthcd, ring->mask);
@@ -1144,7 +809,7 @@ int finish_td(struct aotg_hcd *acthcd, struct aotg_ring *ring, struct aotg_td *t
 	 * fetch transfer_flags by urb instead of td->urb.
 	 */
 	if (urb->actual_length > urb->transfer_buffer_length) {
-		ACT_HCD_DBG
+		
 		urb->actual_length = 0;
 		if (urb->transfer_flags & URB_SHORT_NOT_OK)
 			status = -EREMOTEIO;
@@ -1209,7 +874,7 @@ int isoc_finish_td(struct aotg_hcd *acthcd, struct aotg_ring *ring,
 	int status;
 
 	if (!ring || !td || ((struct list_head *)(&td->enring_list)->next == LIST_POISON1)) {
-		ACT_HCD_ERR
+		
 		return -1;
 	}
 
@@ -1262,19 +927,19 @@ void handle_ring_dma_tx(struct aotg_hcd *acthcd, unsigned int irq_mask)
 	struct aotg_hcep *ep;
 
 	if (AOTG_IS_DMA_OUT(irq_mask))
-		ep = acthcd->outep[AOTG_GET_DMA_NUM(irq_mask)];
+		ep = acthcd->hcep_pool.outep[AOTG_GET_DMA_NUM(irq_mask)];
 	else
-		ep = acthcd->inep[AOTG_GET_DMA_NUM(irq_mask)];
+		ep = acthcd->hcep_pool.inep[AOTG_GET_DMA_NUM(irq_mask)];
 
 	if (ep == NULL) {
-		ACT_HCD_ERR
+		
 		return;
 	}
 
 
 	ring = ep->ring;
 	if (!ring) {
-		ACT_HCD_ERR
+		
 		return;
 	}
 
@@ -1322,7 +987,7 @@ void handle_ring_dma_tx(struct aotg_hcd *acthcd, unsigned int irq_mask)
 		} while (ret == 0);
 
 		if (!is_ring_running(ring)) {
-			pr_debug("%s, intr stop!\n", __func__);
+			//
 		}
 		return;
 	}
@@ -1364,8 +1029,10 @@ void aotg_ring_irq_handler(struct aotg_hcd *acthcd)
 	bool dma_nest = false;
 
 	spin_lock_irqsave(&acthcd->lock, flags);
+	
 	if (acthcd->check_trb_mutex == 1)
 		dma_nest = true;
+	
 	acthcd->check_trb_mutex = 1;
 
 	do {
@@ -1384,6 +1051,7 @@ void aotg_ring_irq_handler(struct aotg_hcd *acthcd)
 
 		handle_ring_dma_tx(acthcd, irq_mask);
 	} while (irq_mask);
+	
 	acthcd->check_trb_mutex = 0;
 	spin_unlock_irqrestore(&acthcd->lock, flags);
 	return;

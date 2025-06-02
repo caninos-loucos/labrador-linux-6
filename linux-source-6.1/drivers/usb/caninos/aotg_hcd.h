@@ -25,8 +25,41 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/hcd.h>
+#include <linux/reset.h>
+#include <linux/dma-mapping.h>
 
 #include "aotg_regs.h"
+
+#define TRB_ITE       (1 << 11)
+#define TRB_CHN       (1 << 10)
+#define TRB_CSP       (1 << 9)
+#define TRB_COF       (1 << 8)
+#define TRB_ICE       (1 << 7)
+#define TRB_IZE       (1 << 6)
+#define TRB_ISE       (1 << 5)
+#define TRB_LT        (1 << 4)
+#define AOTG_TRB_IOC  (1 << 3)
+#define AOTG_TRB_IOZ  (1 << 2)
+#define AOTG_TRB_IOS  (1 << 1)
+#define TRB_OF        (1 << 0)
+
+#define NUM_TRBS  (256)
+#define RING_SIZE (NUM_TRBS * 16)
+
+#define DRIVER_DESC "Caninos USB Host Controller Driver"
+#define DRIVER_NAME "caninos-hcd"
+
+enum caninos_hw_model {
+	CANINOS_HW_MODEL_K5 = 1,
+	CANINOS_HW_MODEL_K7,
+};
+
+struct aotg_trb {
+	u32 hw_buf_ptr;
+	u32 hw_buf_len;
+	u32 hw_buf_remain;
+	u32 hw_token;
+};
 
 #define PERIODIC_SIZE 64
 #define MAX_PERIODIC_LOAD 500 /*50%*/
@@ -86,6 +119,20 @@ enum control_phase {
 #define TD_IN_RING  (0x1 << 0)
 #define TD_IN_QUEUE (0x1 << 1)
 
+/* usbecs register. */
+#define USB2_ECS_VBUS_P0        (10)
+#define USB2_ECS_ID_P0          (12)
+#define USB2_ECS_LS_P0_SHIFT    (8)
+#define USB2_ECS_LS_P0_MASK     (0x3<<8)
+#define USB2_ECS_DPPUEN_P0      (3)
+#define USB2_ECS_DMPUEN_P0      (2)
+#define USB2_ECS_DMPDDIS_P0     (1)
+#define USB2_ECS_DPPDDIS_P0     (0)
+#define USB2_ECS_SOFTIDEN_P0    (1<<26)
+#define USB2_ECS_SOFTID_P0      (27)
+#define USB2_ECS_SOFTVBUSEN_P0  (1<<24)
+#define USB2_ECS_SOFTVBUS_P0    (25)
+
 struct aotg_ring {
 	unsigned is_running:1;
 	unsigned is_out:1;
@@ -133,7 +180,7 @@ struct aotg_td {
 	dma_addr_t intr_men_phyaddr;
 	int mem_size;
 	unsigned cross_ring:1;
-} ____cacheline_aligned_in_smp;
+} __aligned(64);
 
 struct aotg_queue {
 	int in_using;
@@ -170,58 +217,88 @@ struct aotg_dma_buf {
 	int in_using;
 };
 
-struct aotg_hcd {
-	int id;
+extern void urb_tasklet_func(unsigned long data);
+
+struct aotg_hcep_pool
+{
+	struct aotg_hcep *ep0[MAX_EP_NUM];
+	struct aotg_hcep *inep[MAX_EP_NUM];
+	struct aotg_hcep *outep[MAX_EP_NUM];
+};
+
+#define AOTG_MAX_FIFO_MAP_CNT (AOTG_MAX_FIFO_SIZE / ALLOC_FIFO_UNIT)
+#define AOTG_QUEUE_POOL_CNT 60
+
+struct aotg_hcd
+{
+	enum caninos_hw_model model;
+	int uhc_irq;
+	void __iomem *base;
+	void __iomem *usbecs;
+	struct device *dev;
+	volatile int hcd_exiting;
+	struct reset_control *rst;
+	struct clk *clk_usbh_pllen;
+	struct clk *clk_usbh_phy;
+	struct clk *clk_usbh_cce;
 	spinlock_t lock;
 	spinlock_t tasklet_lock;
-	int check_trb_mutex;
+	
+	struct usb_hcd *hcd;
+	
+	resource_size_t rsrc_start, rsrc_len;
+	
+	struct tasklet_struct urb_tasklet;
 	volatile int tasklet_retry;
-	void __iomem *base;
-	struct device *dev;
-	struct aotg_plat_data *port_specific;
-	struct proc_dir_entry *pde;
-	enum usb_device_speed  speed;
+	
 	int inserted; /*imply a USB deivce inserting in MiniA receptacle*/
 	u32 port; /*indicate portstatus and portchange*/
 	enum aotg_rh_state rhstate;
-	int hcd_exiting;
 	
-	u16 hcin_dma_ien;
-	u16 hcout_dma_ien;
+	struct list_head hcd_enqueue_list;
+	struct list_head hcd_dequeue_list;
+	struct list_head hcd_finished_list;
 	
 	/* when using hub, every usb device need a ep0 hcep data struct,
 	 * but share the same hcd ep0.
 	 */
 	struct aotg_hcep *active_ep0;
-	int ep0_block_cnt;
-	struct aotg_hcep *ep0[MAX_EP_NUM];
-	struct aotg_hcep *inep[MAX_EP_NUM];  /* 0 for reserved */
-	struct aotg_hcep *outep[MAX_EP_NUM]; /* 0 for reserved */
+	struct aotg_hcep_pool hcep_pool;
+	struct aotg_queue *queue_pool[AOTG_QUEUE_POOL_CNT];
+	ulong fifo_map[AOTG_MAX_FIFO_MAP_CNT];
 	
-	struct list_head hcd_enqueue_list;
-	struct list_head hcd_dequeue_list;
-	struct list_head hcd_finished_list;
-	struct tasklet_struct urb_tasklet;
+	
+	
+	
+	volatile int discon_happened;
+	volatile int put_aout_msg;
+	
+	int check_trb_mutex;
+	
+	struct proc_dir_entry *pde;
+	enum usb_device_speed  speed;
+	
+	u16 hcin_dma_ien;
+	u16 hcout_dma_ien;
+	
+	int ep0_block_cnt;
 	
 	struct timer_list trans_wait_timer;
 	struct timer_list check_trb_timer;
 	
 	struct hrtimer hotplug_timer;
-	ulong fifo_map[AOTG_MAX_FIFO_SIZE / ALLOC_FIFO_UNIT];
 	
-	int discon_happened;
-	int put_aout_msg;
 	int suspend_request_pend;
 	int bus_remote_wakeup;
-	int uhc_irq;
 	
-	#define AOTG_QUEUE_POOL_CNT 60
-	struct aotg_queue *queue_pool[AOTG_QUEUE_POOL_CNT];
 	#define AOTG_DMA_BUF_CNT 8
 	struct aotg_dma_buf dma_poll[AOTG_DMA_BUF_CNT];
 };
 
-struct aotg_hcep {
+extern void aotg_hcep_pool_init(struct aotg_hcd *acthcd);
+
+struct aotg_hcep
+{
 	struct usb_host_endpoint *hep;
 	struct usb_device *udev;
 	int index;
@@ -241,8 +318,9 @@ struct aotg_hcep {
 	u8 buftype;
 	u8 has_hub;
 	u8 hub_addr;
+	u8 dev_addr;
 	u8 reg_hcep_splitcs_val;
-
+	
 	void __iomem *reg_hcepcs;
 	void __iomem *reg_hcepcon;
 	void __iomem *reg_hcepctrl;
@@ -267,6 +345,8 @@ struct aotg_hcep {
 	u16 fifo_busy;
 
 	ulong fifo_addr;
+	
+	
 	struct aotg_queue *q;
 
 	struct aotg_ring *ring;
@@ -275,115 +355,141 @@ struct aotg_hcep {
 	struct list_head dering_td_list;
 };
 
-#define  get_hcepcon_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*8)
-#define  get_hcepcs_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*8)
-#define  get_hcepctrl_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*4)
-#define  get_hcepbc_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*8)
-#define  get_hcepmaxpck_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*2)
-#define  get_hcepaddr_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*4)
-/*#define  get_hcfifo_reg(x , z)   (x + (z - 1)*4)*/
-#define  get_hcep_dev_addr_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*8)
-#define  get_hcep_port_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*8)
-#define  get_hcep_splitcs_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*8)
+#define get_hcepcon_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*8)
+#define get_hcepcs_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*8)
+#define get_hcepctrl_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*4)
+#define get_hcepbc_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*8)
+#define get_hcepmaxpck_reg(dir , x , y , z)   ((dir ? x : y) + (z - 1)*2)
+#define get_hcepaddr_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*4)
+#define get_hcep_dev_addr_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*8)
+#define get_hcep_port_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*8)
+#define get_hcep_splitcs_reg(dir , x , y , z)  ((dir ? x : y) + (z - 1)*8)
+#define get_hcerr_reg(dir, x, y, z)  ((dir ? x : y) + (z)*4)
+#define get_hcep_interval_reg(dir, x, y, z) (dir ? (x + (z-1)*8) : (y + (z)*8))
+#define GET_DMALINKADDR_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
+#define GET_CURADDR_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
+#define GET_DMACTRL_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
+#define GET_DMACOMPLETE_CNT_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
 
 #define AOTG_DMA_OUT_PREFIX 0x10
 #define AOTG_DMA_NUM_MASK 0xf
 #define AOTG_IS_DMA_OUT(x) ((x) & AOTG_DMA_OUT_PREFIX)
 #define AOTG_GET_DMA_NUM(x) ((x) & AOTG_DMA_NUM_MASK)
 
-#define GET_DMALINKADDR_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
-#define GET_CURADDR_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
-#define GET_DMACTRL_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
-#define GET_DMACOMPLETE_CNT_REG(dir, x, y, z) ((dir ? x : y) + (z - 1) * 0x10)
+// caninos-xfer.c ------------------------------------------------------------//
 
-static inline struct aotg_hcd *hcd_to_aotg(struct usb_hcd *hcd)
+extern void release_fifo_slot(struct aotg_hcd *, struct aotg_hcep *);
+
+extern ulong get_fifo_slot(struct aotg_hcd *, int size);
+
+extern void hcep_free(struct usb_hcd *, struct aotg_hcep *);
+
+extern int hcep_config(struct usb_hcd *, struct urb *, struct aotg_hcep *);
+
+// -------------------------------------------------------------------------- //
+
+static inline void pio_irq_disable(struct aotg_hcd *acthcd, u8 mask)
 {
-	return (!hcd) ? NULL : ((struct aotg_hcd *) hcd->hcd_priv);
+	u8 is_out = mask & USB_HCD_OUT_MASK;
+	u8 ep_num = mask & 0x0f;
+	
+	if (is_out) {
+		usb_clearbitsw(1 << ep_num, acthcd->base + HCOUTxIEN0);
+	}
+	else {
+		usb_clearbitsw(1 << ep_num, acthcd->base + HCINxIEN0);
+	}
 }
 
-static inline void aotg_clear_all_overflow_irq(struct aotg_hcd *acthcd)
+static inline void pio_irq_clear(struct aotg_hcd *acthcd, u8 mask)
 {
-	unsigned int irq_pend = 0;
-
-	irq_pend = readl(acthcd->base + HCDMAxOVERFLOWIRQ);
-
-	if (irq_pend)
-		writel(irq_pend, acthcd->base + HCDMAxOVERFLOWIRQ);
-
-	return;
+	u8 is_out = mask & USB_HCD_OUT_MASK;
+	u8 ep_num = mask & 0x0f;
+	
+	if (is_out) {
+		writew(1 << ep_num, acthcd->base + HCOUTxIRQ0);
+	}
+	else {
+		writew(1 << ep_num, acthcd->base + HCINxIRQ0);
+	}
 }
 
-static inline void aotg_clear_all_shortpkt_irq(struct aotg_hcd *acthcd)
-{
-	unsigned int irq_pend = 0;
-
-	irq_pend = readw(acthcd->base + HCINxSHORTPCKIRQ0);
-
-	if (irq_pend)
-		writew(irq_pend, acthcd->base + HCINxSHORTPCKIRQ0);
-	return;
-}
-
-static inline void aotg_clear_all_zeropkt_irq(struct aotg_hcd *acthcd)
-{
-	unsigned int irq_pend = 0;
-
-	irq_pend = readw(acthcd->base + HCINxZEROPCKIEN0);
-
-	if (irq_pend)
-		writew(irq_pend, acthcd->base + HCINxZEROPCKIEN0);
-	return;
-}
-
-static inline void aotg_enable_irq(struct aotg_hcd *acthcd)
-{
-	writeb(USBEIRQ_USBIEN, acthcd->base + USBEIRQ);
-	usb_setbitsb(USBEIRQ_USBIEN, acthcd->base + USBEIEN);
-	usb_setbitsb(0x1<<2, acthcd->base + OTGIEN);
-	usb_setbitsb(OTGCTRL_BUSREQ, acthcd->base + OTGCTRL);
-}
-
-static inline void aotg_disable_irq(struct aotg_hcd *acthcd)
-{
-	writeb(USBEIRQ_USBIEN, acthcd->base + USBEIRQ);
-	usb_clearbitsb(USBEIRQ_USBIEN, acthcd->base + USBEIEN);
-	usb_clearbitsb(0x1<<2, acthcd->base + OTGIEN);
-	usb_clearbitsb(OTGCTRL_BUSREQ, acthcd->base + OTGCTRL);
-}
-
-static inline void aotg_clear_all_hcoutdma_irq(struct aotg_hcd *acthcd)
-{
-	unsigned int irq_pend = 0;
-
-	irq_pend = readw(acthcd->base + HCOUTxDMAIRQ0);
-
-	if (irq_pend)
-		writew(irq_pend, acthcd->base + HCOUTxDMAIRQ0);
-	return;
-}
-
-static inline void aotg_hcep_reset(struct aotg_hcd *acthcd, u8 ep_mask, u8 type_mask)
+static inline void ep_reset(struct aotg_hcd *acthcd, u8 ep_mask, u8 type_mask)
 {
 	u8 val;
-
-	writeb(ep_mask, acthcd->base + ENDPRST); /*select ep */
+	writeb(ep_mask, acthcd->base + ENDPRST);
 	val = ep_mask | type_mask;
-	writeb(val, acthcd->base + ENDPRST); /*reset ep */
-	return;
+	writeb(val, acthcd->base + ENDPRST);
 }
 
-static inline struct usb_hcd *aotg_to_hcd(struct aotg_hcd *acthcd)
-{
-	return container_of((void *)acthcd, struct usb_hcd, hcd_priv);
+static inline void ep_enable(struct aotg_hcep *ep) {
+	usb_setbitsb(0x80, ep->reg_hcepcon);
 }
 
-extern void aotg_hcd_init(struct usb_hcd *hcd);
+static inline void ep_disable(struct aotg_hcep *ep) {
+	usb_clearbitsb(0x80, ep->reg_hcepcon);
+}
 
-extern void aotg_hcd_exit(struct usb_hcd *hcd);
+extern int aotg_hcep_ctrl_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags);
 
-extern void caninos_hcd_fill_ops(struct hc_driver *driver);
+extern int aotg_hcep_intr_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags);
+
+extern int aotg_hcep_xfer_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags);
+
+extern u32 ring_trb_virt_to_dma(struct aotg_ring *ring, struct aotg_trb *trb_vaddr);
+
+extern int aotg_ring_enqueue_intr_td(
+	struct aotg_hcd *acthcd, struct aotg_hcep *ep,
+	struct urb *urb, gfp_t mem_flags);
+
+void aotg_start_ring_transfer(struct aotg_hcd *acthcd, struct aotg_hcep *ep, struct urb *urb);
+
+static inline struct aotg_hcd *hcd_to_aotg(struct usb_hcd *hcd) {
+	return ((struct aotg_hcd *) hcd->hcd_priv);
+}
+
+static inline struct usb_hcd * aotg_to_hcd(struct aotg_hcd *acthcd) {
+	return acthcd->hcd;
+}
+
+extern void aotg_clear_all_overflow_irq(struct aotg_hcd *acthcd);
+
+extern void aotg_clear_all_shortpkt_irq(struct aotg_hcd *acthcd);
+
+extern void aotg_clear_all_zeropkt_irq(struct aotg_hcd *acthcd);
+
+extern void aotg_clear_all_hcoutdma_irq(struct aotg_hcd *acthcd);
+
+extern void aotg_enable_irq(struct aotg_hcd *acthcd);
+
+extern void aotg_disable_irq(struct aotg_hcd *acthcd);
+
+extern void aotg_hcep_reset(struct aotg_hcd *acthcd, u8 ep_mask, u8 type_mask);
+
+extern void aotg_powergate_on(struct aotg_hcd *acthcd);
+
+extern void aotg_powergate_off(struct aotg_hcd *acthcd);
+
+extern int aotg_kmem_cache_create(void);
+
+extern void aotg_kmem_cache_destroy(void);
+
+extern struct aotg_td *aotg_alloc_td(gfp_t mem_flags);
+
+extern void aotg_release_td(struct aotg_td *td);
 
 
+extern int caninos_usb_add_hcd(struct usb_hcd *hcd);
+
+extern void caninos_usb_hcd_remove(struct usb_hcd *hcd);
+
+extern struct usb_hcd *caninos_usb_create_hcd(struct device *dev);
+
+
+
+extern void enqueue_trb(struct aotg_ring *ring, u32 buf_ptr, u32 buf_len, u32 token);
+
+extern int ring_enqueue_sg_td(struct aotg_hcd *acthcd, struct aotg_ring *ring, struct aotg_td *td);
 
 
 void aotg_hcd_release_queue(struct aotg_hcd *acthcd, struct aotg_queue *q);
@@ -403,14 +509,13 @@ int aotg_ring_dequeue_td(struct aotg_hcd *acthcd, struct aotg_ring *ring,
 	struct aotg_td *td, int dequeue_flag);
 int aotg_ring_enqueue_isoc_td(struct aotg_hcd *acthcd,
 	struct aotg_ring *ring, struct aotg_td *td);
-int aotg_ring_enqueue_intr_td(struct aotg_hcd *acthcd, struct aotg_ring *ring,
-	struct aotg_hcep *ep, struct urb *urb, gfp_t mem_flags);
+
 int aotg_ring_dequeue_intr_td(struct aotg_hcd *acthcd, struct aotg_hcep *ep,
 	struct aotg_ring *ring,	struct aotg_td *td);
 void aotg_intr_dma_pool_destroy(struct aotg_ring *ring);
 void aotg_intr_dma_buf_free(struct aotg_hcd *acthcd, struct aotg_ring *ring);
-struct aotg_td *aotg_alloc_td(gfp_t mem_flags);
-void aotg_release_td(struct aotg_td *td);
+
+
 int is_ring_running(struct aotg_ring *ring);
 void aotg_start_ring(struct aotg_ring *ring, u32 addr);
 void aotg_stop_ring(struct aotg_ring *ring);

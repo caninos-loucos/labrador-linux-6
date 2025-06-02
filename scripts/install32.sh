@@ -4,13 +4,13 @@ USER=$(whoami)
 
 if [ -d /media/BOOT ]; then
 	echo "BOOT mounted in /media"
-	BOOTDIR=/media/BOOT/
+	BOOTDIR=/media/BOOT
 elif [ -d /media/${USER}/BOOT ]; then
 	echo "BOOT mounted in /media/user"
-	BOOTDIR=/media/${USER}/BOOT/
+	BOOTDIR=/media/${USER}/BOOT
 elif [ -d /run/media/${USER}/BOOT ]; then
 	echo "BOOT mounted in /run/media/user"
-	BOOTDIR=/run/media/${USER}/BOOT/
+	BOOTDIR=/run/media/${USER}/BOOT
 else
 	echo "Error: BOOT directory not found or not mounted."
 	exit 1
@@ -18,13 +18,13 @@ fi
 
 if [ -d /media/SYSTEM ]; then
 	echo "SYSTEM mounted in /media"
-	LIBDIR=/media/SYSTEM/lib/
+	LIBDIR=/media/SYSTEM/lib
 elif [ -d /media/${USER}/SYSTEM ]; then
 	echo "SYSTEM mounted in /media/user"
-	LIBDIR=/media/${USER}/SYSTEM/lib/
+	LIBDIR=/media/${USER}/SYSTEM/lib
 elif [ -d /run/media/${USER}/SYSTEM ]; then
 	echo "SYSTEM mounted in /run/media/user"
-	LIBDIR=/run/media/${USER}/SYSTEM/lib/
+	LIBDIR=/run/media/${USER}/SYSTEM/lib
 else
 	echo "Error: SYSTEM directory not found or not mounted."
 	exit 1

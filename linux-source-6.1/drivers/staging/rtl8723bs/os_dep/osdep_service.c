@@ -148,8 +148,10 @@ int rtw_change_ifname(struct adapter *padapter, const char *ifname)
 	SET_NETDEV_DEV(pnetdev, dvobj_to_dev(adapter_to_dvobj(padapter)));
 
 	rtw_init_netdev_name(pnetdev, ifname);
+	
+	eth_hw_addr_set(pnetdev, padapter->eeprompriv.mac_addr);
 
-	memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
+	//memcpy(pnetdev->dev_addr, padapter->eeprompriv.mac_addr, ETH_ALEN);
 
 	if (!rtnl_is_locked())
 		ret = register_netdev(pnetdev);

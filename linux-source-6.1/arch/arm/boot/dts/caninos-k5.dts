@@ -377,7 +377,7 @@
 			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
 			resets = <&rst RST_UART2>;
 			reset-names = "uart";
-			status = "disabled";
+			status = "okay";
 			
 			pinctrl-names = "default";
 			pinctrl-0 = <>;
