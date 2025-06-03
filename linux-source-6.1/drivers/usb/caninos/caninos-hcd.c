@@ -498,12 +498,13 @@ static void aotg_hcd_err_handle(
 	u8 reset = 0;
 	struct usb_hcd *hcd = aotg_to_hcd(acthcd);
 	
-	dev_info(acthcd->dev, "hcd ep err ep_num:%d, is_in:%d\n", ep_num, is_in);
+	//dev_info(acthcd->dev, "hcd ep err ep_num:%d, is_in:%d\n", ep_num, is_in);
 	
 	if (is_in)
 		writew(1 << ep_num, acthcd->base + HCINxERRIRQ0);
 	else
 		writew(1 << ep_num, acthcd->base + HCOUTxERRIRQ0);
+	
 	if (ep_num == 0) {
 		ep = acthcd->active_ep0;
 		if (ep == NULL) {
@@ -514,7 +515,8 @@ static void aotg_hcd_err_handle(
 			ep->reg_hcerr = acthcd->base + HCIN0ERR;
 		else
 			ep->reg_hcerr = acthcd->base + HCOUT0ERR;
-	} else {
+	}
+	else {
 		if (is_in)
 			ep = acthcd->hcep_pool.inep[ep_num];
 		else
@@ -538,7 +540,7 @@ static void aotg_hcd_err_handle(
 	err_val = readb(ep->reg_hcerr);
 	err_type = err_val & HCINxERR_TYPE_MASK;
 	
-	dev_info(acthcd->dev, "err_type:%x\n", err_type>>2);
+	//dev_info(acthcd->dev, "err_type:%x\n", err_type>>2);
 	
 	switch (err_type) {
 	case HCINxERR_NO_ERR:
@@ -586,19 +588,29 @@ static void aotg_hcd_err_handle(
 		status = -ENODEV;
 	}
 
-	if (ep->index == 0) {
+	if (ep->index == 0)
+	{
 		q = ep->q;
 		urb = q->urb;
+		
+		if (err_type != HCINxERR_STALL)
+		{
+			dev_info(acthcd->dev, "%s ep0 error 0x%02X error type 0x%02X\n",
+			         __func__, err_val, (err_val>>2)&0x7);
+		}
+		
 		if ((status == -EPIPE) || (status == -ENODEV))
 			writeb(HCINxERR_RESEND, ep->reg_hcerr);
+		
 		finish_request(acthcd, q, status);
-		dev_info(acthcd->dev, "%s ep %d error [0x%02X] error type [0x%02X], reset it...\n",
-			usb_pipeout(urb->pipe) ? "HC OUT" : "HC IN", ep->index, err_val, (err_val>>2)&0x7);
-	} else {
-		if ((status != -EPIPE) && (status != -ENODEV)) {
+	}
+	else
+	{
+		if ((status != -EPIPE) && (status != -ENODEV))
+		{
 			dev_info(acthcd->dev,"td->err_count:%d,ep_errcount:%d\n", td->err_count, ep->error_count);
 			td->err_count++;
-
+			
 			if ((td->err_count < MAX_ERROR_COUNT) && (ep->error_count < 3)) {
 				writeb(HCINxERR_RESEND, ep->reg_hcerr);
 				return;
@@ -610,19 +622,15 @@ static void aotg_hcd_err_handle(
 
 		reset = ENDPRST_FIFORST | ENDPRST_TOGRST;
 		ep_disable(ep);
+		
 		if (is_in)
 			ep_reset(acthcd, ep->mask, reset);
 		else
 			ep_reset(acthcd, ep->mask | USB_HCD_OUT_MASK, reset);
 
-		/*if (usb_pipeout(urb->pipe)) {
-			ep_reset(acthcd, ep->mask | USB_HCD_OUT_MASK, reset);
-		} else {
-			ep_reset(acthcd, ep->mask, reset);
-		}*/
-
 		aotg_stop_ring(ring);
 		urb = td->urb;
+		
 		if (ep->type == PIPE_INTERRUPT)
 			dequeue_intr_td(ring, td);
 		else
@@ -631,7 +639,8 @@ static void aotg_hcd_err_handle(
 		if (urb) {
 			usb_hcd_unlink_urb_from_ep(hcd, urb);
 			usb_hcd_giveback_urb(hcd, urb, status);
-		} else {
+		}
+		else {
 			dev_info(acthcd->dev,"urb not exist!\n");
 		}
 
@@ -642,8 +651,6 @@ static void aotg_hcd_err_handle(
 		dev_info(acthcd->dev, "%s ep %d error [0x%02X] error type [0x%02X], reset it...\n",
 			is_in ? "HC IN" : "HC OUT", ep->index, err_val, (err_val>>2)&0x7);
 	}
-
-	return;
 }
 
 static void handle_suspend(struct aotg_hcd *acthcd)
@@ -950,16 +957,19 @@ enum hrtimer_restart aotg_hub_hotplug_timer(struct hrtimer *hrt)
 		return HRTIMER_NORESTART;
 	}
 
-	if ((readb(acthcd->base + OTGSTATE) == AOTG_STATE_A_HOST) && (acthcd->discon_happened == 0)) {
+	if ((readb(acthcd->base + OTGSTATE) == AOTG_STATE_A_HOST) && (acthcd->discon_happened == 0))
+	{
 		if (!acthcd->inserted) {
 			acthcd->port |= (USB_PORT_STAT_C_CONNECTION << 16);
+			
 			/*set port status bit,and indicate the present of  a device */
 			acthcd->port |= USB_PORT_STAT_CONNECTION;
 			acthcd->rhstate = AOTG_RH_ATTACHED;
 			acthcd->inserted = 1;
 			connect_changed = 1;
 		}
-	} else {
+	}
+	else {
 		if (acthcd->inserted) {
 			acthcd->port &= ~(USB_PORT_STAT_CONNECTION |
 					  USB_PORT_STAT_ENABLE |
@@ -1189,7 +1199,7 @@ static int aotg_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mflags)
 static int aotg_hub_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 {
 	struct aotg_hcd *acthcd = hcd_to_aotg(hcd);
-	struct aotg_hcep *ep;
+	struct aotg_hcep *ep = NULL;
 	struct aotg_queue *q = NULL, *next, *tmp;
 	struct aotg_ring *ring;
 	struct aotg_td *td, *next_td;
@@ -1223,20 +1233,23 @@ static int aotg_hub_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status
 		spin_unlock_irqrestore(&acthcd->lock, flags);
 		return retval;
 	}
-
-	ep = (struct aotg_hcep *)urb->ep->hcpriv;
+	
+	if (urb->ep != NULL) {
+		ep = (struct aotg_hcep *)urb->ep->hcpriv;
+	}
 	
 	if (ep == NULL) {
 		retval = -EINVAL;
 		goto dequeue_out;
 	}
-
+	
 	if (!usb_pipecontrol(urb->pipe))
 	{
 		ep->urb_unlinked_cnt++;
 		ring = ep->ring;
 
-		if (usb_pipeint(urb->pipe)) {
+		if (usb_pipeint(urb->pipe))
+		{
 			list_for_each_entry_safe(td, next_td, &ep->enring_td_list, enring_list) {
 				if (urb == td->urb) {
 					retval = aotg_ring_dequeue_intr_td(acthcd, ep, ring, td);
@@ -1504,6 +1517,7 @@ static void aotg_hub_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpo
 	spin_lock_irqsave(&acthcd->lock, flags);
 
 	index = ep->index;
+	
 	if (index == 0) {
 		acthcd->hcep_pool.ep0[ep->ep0_index] = NULL;
 		if (acthcd->active_ep0 == ep)
@@ -2012,6 +2026,8 @@ static void aotg_hcd_stop(struct usb_hcd *hcd)
 	struct aotg_hcd *acthcd = hcd_to_aotg(hcd);
 	unsigned long flags;
 	
+	dev_info(acthcd->dev, "%s\n", __func__);
+	
 	spin_lock_irqsave(&acthcd->lock, flags);
 	
 	acthcd->hcd_exiting = 1;
@@ -2038,6 +2054,8 @@ static int aotg_hcd_start(struct usb_hcd *hcd)
 	struct aotg_hcd *acthcd = hcd_to_aotg(hcd);
 	unsigned long flags;
 	
+	dev_info(acthcd->dev, "%s\n", __func__);
+	
 	spin_lock_irqsave(&acthcd->lock, flags);
 	
 	hcd->uses_new_polling = 1;
@@ -2045,6 +2063,10 @@ static int aotg_hcd_start(struct usb_hcd *hcd)
 	aotg_enable_irq(acthcd);
 	
 	spin_unlock_irqrestore(&acthcd->lock, flags);
+	
+	hrtimer_start(
+		&acthcd->hotplug_timer, ktime_set(0, 500*NSEC_PER_MSEC),
+		HRTIMER_MODE_REL);
 	
 	return 0;
 }
@@ -2144,7 +2166,7 @@ int caninos_usb_add_hcd(struct usb_hcd *hcd)
 	if (retval)
 	{
 		aotg_powergate_off(acthcd);
-		dev_err(acthcd->dev, "unable to reset the hw\n");
+		dev_err(acthcd->dev, "usb add hcd failed\n");
 		return retval;
 	}
 	

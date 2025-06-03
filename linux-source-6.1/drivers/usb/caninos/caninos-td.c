@@ -135,10 +135,7 @@ int ring_enqueue_sg_td(
 	}
 	
 	sg = urb->sg;
-	
 	addr = (u32)sg_dma_address(sg);
-	
-	
 	this_trb_len = (u32)min_t(int, sg_dma_len(sg), len);
 	
 	if (is_out) {

@@ -161,15 +161,14 @@ int aotg_hcep_xfer_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 		list_add_tail(&td->queue_list, &ep->queue_td_list);
 	}
 	
-	if (!list_empty(&ep->enring_td_list) && 
-	    !is_ring_running(ep->ring))
+	if (!list_empty(&ep->enring_td_list) && !is_ring_running(ep->ring))
 	{
 		
 		if (usb_pipetype(urb->pipe) == PIPE_ISOCHRONOUS)
 		{
-			if (ep->ring->dequeue_trb != ep->ring->first_trb) {
-				aotg_reorder_iso_td(acthcd, ep->ring);
-			}
+			//if (ep->ring->dequeue_trb != ep->ring->first_trb) {
+			//	aotg_reorder_iso_td(acthcd, ep->ring);
+			//}
 		}
 		
 		aotg_start_ring_transfer(acthcd, ep, urb);

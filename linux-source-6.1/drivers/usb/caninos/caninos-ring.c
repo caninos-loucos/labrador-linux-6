@@ -392,7 +392,7 @@ void aotg_reorder_iso_td(struct aotg_hcd *acthcd, struct aotg_ring *ring)
 	struct aotg_hcep *ep = (struct aotg_hcep *)ring->priv;
 
 	new_trb_q = (struct aotg_trb *)
-		dma_alloc_coherent(dev,	NUM_TRBS * sizeof(struct aotg_trb),
+		dma_alloc_coherent(dev, NUM_TRBS * sizeof(struct aotg_trb),
 		&dma, GFP_ATOMIC);
 	
 	if (!new_trb_q)
@@ -968,8 +968,7 @@ void handle_ring_dma_tx(struct aotg_hcd *acthcd, unsigned int irq_mask)
 		}
 
 		if (!list_empty(&ep->enring_td_list) && !is_ring_running(ring)) {
-			//if (ring->dequeue_trb != ring->first_trb)
-				//aotg_reorder_iso_td(acthcd, ring);
+			
 			aotg_start_ring(ring, ring_trb_virt_to_dma(ring, ring->dequeue_trb));
 		} else if (list_empty(&ep->enring_td_list) && is_ring_running(ring)) {
 			aotg_stop_ring(ring);

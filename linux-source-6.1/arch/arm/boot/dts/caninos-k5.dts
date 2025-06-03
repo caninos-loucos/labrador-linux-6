@@ -229,7 +229,7 @@
 			status = "okay";
 		};
 		
-		pinctrl: pinctrl@b01b0000 {    
+		pinctrl: pinctrl@b01b0000 {
 			compatible = "caninos,k5-pinctrl";
 			reg = <0xb01b0000 0x1000>;
 			clocks = <&cmu CLK_GPIO>;
@@ -521,6 +521,13 @@
 				
 				atc260x_battery: atc260x-battery {
 					compatible = "caninos,atc2603c-battery";
+					status = "okay";
+				};
+				
+				atc260x_gpio: atc260x-gpio {
+					compatible = "caninos,atc2603c-gpio";
+					gpio-controller;
+					#gpio-cells = <2>;
 					status = "okay";
 				};
 			};
