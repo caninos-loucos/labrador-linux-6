@@ -600,9 +600,8 @@
 			reg-names = "base", "usbecs";
 			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&cmu CLK_USB2H0_PLLEN>,
-			         <&cmu CLK_USB2H0_PHY>,
-			         <&cmu CLK_USB2H0_CCE>;
-			clock-names = "pllen", "phy", "cce";
+			         <&cmu CLK_USB2H0_PHY>;
+			clock-names = "pllen", "phy";
 			resets = <&rst RST_USBH0>;
 			reset-names = "usb";
 			status = "okay";
@@ -614,9 +613,8 @@
 			reg-names = "base", "usbecs";
 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&cmu CLK_USB2H1_PLLEN>,
-			         <&cmu CLK_USB2H1_PHY>,
-			         <&cmu CLK_USB2H1_CCE>;
-			clock-names = "pllen", "phy", "cce";
+			         <&cmu CLK_USB2H1_PHY>;
+			clock-names = "pllen", "phy";
 			resets = <&rst RST_USBH1>;
 			reset-names = "usb";
 			status = "okay";

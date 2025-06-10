@@ -43,17 +43,13 @@ static void aotg_hcd_init(struct aotg_hcd *acthcd)
 	spin_lock_init(&acthcd->tasklet_lock);
 	acthcd->tasklet_retry = 0;
 	
-	acthcd->port = 0;
-	acthcd->rhstate = AOTG_RH_POWEROFF;
-	acthcd->inserted = 0;
-	
 	INIT_LIST_HEAD(&acthcd->hcd_enqueue_list);
 	INIT_LIST_HEAD(&acthcd->hcd_dequeue_list);
 	INIT_LIST_HEAD(&acthcd->hcd_finished_list);
 	
 	acthcd->active_ep0 = NULL;
 	
-	aotg_hcep_pool_init(acthcd);
+	aotg_hcd_pool_init(acthcd);
 	
 	acthcd->fifo_map[0] = BIT(31);
 	acthcd->fifo_map[1] = BIT(31) | ALLOC_FIFO_UNIT;
@@ -62,19 +58,9 @@ static void aotg_hcd_init(struct aotg_hcd *acthcd)
 		acthcd->fifo_map[i] = 0;
 	}
 	
-	for (i = 0; i < AOTG_QUEUE_POOL_CNT; i++) {
-		acthcd->queue_pool[i] = NULL;
-	}
-	
-	acthcd->put_aout_msg = 0;
-	acthcd->discon_happened = 0;
-	
 	tasklet_init(&acthcd->urb_tasklet, urb_tasklet_func, (unsigned long)acthcd);
 	timer_setup(&acthcd->trans_wait_timer, aotg_hub_trans_wait_timer, 0);
 	timer_setup(&acthcd->check_trb_timer, aotg_check_trb_timer, 0);
-	
-	hrtimer_init(&acthcd->hotplug_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	acthcd->hotplug_timer.function = aotg_hub_hotplug_timer;
 }
 
 static int caninos_hcd_probe(struct platform_device *pdev)
@@ -195,32 +181,32 @@ static int caninos_hcd_probe(struct platform_device *pdev)
 		return retval;
 	}
 	
-	acthcd->clk_usbh_cce = devm_clk_get(&pdev->dev, "cce");
+	hcd->rsrc_start = acthcd->rsrc_start;
+	hcd->rsrc_len = acthcd->rsrc_len;
+	hcd->regs = acthcd->base;
+	hcd->self.sg_tablesize = 32;
+	hcd->self.uses_pio_for_control = 1;
+	hcd->has_tt = 1;
 	
-	if (IS_ERR(acthcd->clk_usbh_cce))
-	{
-		retval = PTR_ERR(acthcd->clk_usbh_cce);
-		dev_err(&pdev->dev, "could not get cce clk, %d\n", retval);
-		usb_put_hcd(hcd);
-		return retval;
-	}
-	
-	retval = caninos_usb_add_hcd(hcd);
+	retval = usb_add_hcd(hcd, acthcd->uhc_irq, 0);
 	
 	if (retval)
 	{
+		dev_err(acthcd->dev, "usb add hcd failed\n");
 		usb_put_hcd(hcd);
 		return retval;
 	}
+	
+	//device_wakeup_enable(hcd->self.controller);
+	dev_info(acthcd->dev, "probe finished\n");
 	return 0;
 }
 
 static int caninos_hcd_remove(struct platform_device *pdev)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-	
-	caninos_usb_hcd_remove(hcd);
-	
+	usb_remove_hcd(hcd);
+	usb_put_hcd(hcd);
 	return 0;
 }
 

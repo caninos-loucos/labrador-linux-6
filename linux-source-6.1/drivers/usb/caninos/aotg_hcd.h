@@ -92,15 +92,15 @@ struct hcd_stats {
 };
 
 enum aotg_rh_state {
-	AOTG_RH_POWEROFF,
-	AOTG_RH_POWERED,
-	AOTG_RH_ATTACHED,
-	AOTG_RH_NOATTACHED,
-	AOTG_RH_RESET,
+	AOTG_RH_POWEROFF,    ///used
+	AOTG_RH_POWERED,     ///used
+	AOTG_RH_ATTACHED,    ///used
+	AOTG_RH_NOATTACHED,  ///used
+	AOTG_RH_RESET,       ///used
 	AOTG_RH_ENABLE,
-	AOTG_RH_DISABLE,
+	AOTG_RH_DISABLE,     ///used
 	AOTG_RH_SUSPEND,
-	AOTG_RH_ERR
+	AOTG_RH_ERROR        ///used
 };
 
 enum control_phase {
@@ -133,7 +133,11 @@ enum control_phase {
 #define USB2_ECS_SOFTVBUSEN_P0  (1<<24)
 #define USB2_ECS_SOFTVBUS_P0    (25)
 
-struct aotg_ring {
+
+
+
+struct aotg_ring
+{
 	unsigned is_running:1;
 	unsigned is_out:1;
 	unsigned intr_inited:1;
@@ -149,7 +153,7 @@ struct aotg_ring {
 	struct dma_pool *intr_dma_pool;
 	u8 *intr_dma_buf_vaddr;
 	dma_addr_t intr_dma_buf_phyaddr;
-	char pool_name[32];
+
 
 	struct aotg_trb *enqueue_trb;
 	struct aotg_trb *dequeue_trb;
@@ -182,42 +186,32 @@ struct aotg_td {
 	unsigned cross_ring:1;
 } __aligned(64);
 
-struct aotg_queue {
-	int in_using;
+struct aotg_queue
+{
+	struct aotg_td td;
 	struct aotg_hcep *ep;
 	struct urb *urb;
-	int dma_no;
+	int status;
+	int length;
+	int err_count;
 	int is_xfer_start;
-	int need_zero;
-	
+	unsigned long timeout;
 	struct list_head enqueue_list;
 	struct list_head dequeue_list;
 	struct list_head finished_list;
-	int status;
-	int length;
-	
-	struct aotg_td td;
-	
-	struct scatterlist *cur_sg;
-	int err_count;
-	unsigned long timeout; /* jiffies + n. */
-	
-	/* fixing dma address unaligned to 4 Bytes. */
-	u8 *dma_copy_buf;
-	dma_addr_t dma_addr;
-	
-	/* for debug. */
-	unsigned int seq_info;
-} __attribute__ ((aligned(4)));
-
-struct aotg_dma_buf {
-	unsigned int size;
-	u8 *buf;
-	dma_addr_t dma;
-	int in_using;
 };
 
 extern void urb_tasklet_func(unsigned long data);
+
+#define AOTG_MAX_FIFO_MAP_CNT (AOTG_MAX_FIFO_SIZE / ALLOC_FIFO_UNIT)
+
+struct aotg_queue_pool
+{
+	#define AOTG_QUEUE_POOL_CNT 60
+	struct aotg_queue queue[AOTG_QUEUE_POOL_CNT];
+	atomic64_t used_queue;
+	spinlock_t lock;
+};
 
 struct aotg_hcep_pool
 {
@@ -226,8 +220,22 @@ struct aotg_hcep_pool
 	struct aotg_hcep *outep[MAX_EP_NUM];
 };
 
-#define AOTG_MAX_FIFO_MAP_CNT (AOTG_MAX_FIFO_SIZE / ALLOC_FIFO_UNIT)
-#define AOTG_QUEUE_POOL_CNT 60
+struct aotg_hcd;
+
+struct aotg_hotplug
+{
+	struct work_struct work;
+	struct aotg_hcd *acthcd;
+	wait_queue_head_t event;
+	spinlock_t irq_lock;
+	struct mutex lock;
+	atomic_t mailbox;
+	atomic_t running;
+	atomic_t prstate;
+	atomic_t rhstate;
+	int prev_prstate;
+	u16 wPortChange;
+};
 
 struct aotg_hcd
 {
@@ -240,7 +248,6 @@ struct aotg_hcd
 	struct reset_control *rst;
 	struct clk *clk_usbh_pllen;
 	struct clk *clk_usbh_phy;
-	struct clk *clk_usbh_cce;
 	spinlock_t lock;
 	spinlock_t tasklet_lock;
 	
@@ -251,32 +258,11 @@ struct aotg_hcd
 	struct tasklet_struct urb_tasklet;
 	volatile int tasklet_retry;
 	
-	int inserted; /*imply a USB deivce inserting in MiniA receptacle*/
-	u32 port; /*indicate portstatus and portchange*/
-	enum aotg_rh_state rhstate;
-	
-	struct list_head hcd_enqueue_list;
-	struct list_head hcd_dequeue_list;
-	struct list_head hcd_finished_list;
-	
-	/* when using hub, every usb device need a ep0 hcep data struct,
-	 * but share the same hcd ep0.
-	 */
-	struct aotg_hcep *active_ep0;
 	struct aotg_hcep_pool hcep_pool;
-	struct aotg_queue *queue_pool[AOTG_QUEUE_POOL_CNT];
+	
 	ulong fifo_map[AOTG_MAX_FIFO_MAP_CNT];
 	
-	
-	
-	
-	volatile int discon_happened;
-	volatile int put_aout_msg;
-	
 	int check_trb_mutex;
-	
-	struct proc_dir_entry *pde;
-	enum usb_device_speed  speed;
 	
 	u16 hcin_dma_ien;
 	u16 hcout_dma_ien;
@@ -286,16 +272,19 @@ struct aotg_hcd
 	struct timer_list trans_wait_timer;
 	struct timer_list check_trb_timer;
 	
-	struct hrtimer hotplug_timer;
+	/* when using hub, every usb device need a ep0 hcep data struct,
+	 * but share the same hcd ep0.
+	 */
+	struct aotg_hcep *active_ep0;
 	
-	int suspend_request_pend;
-	int bus_remote_wakeup;
+	struct list_head hcd_enqueue_list;
+	struct list_head hcd_dequeue_list;
+	struct list_head hcd_finished_list;
 	
-	#define AOTG_DMA_BUF_CNT 8
-	struct aotg_dma_buf dma_poll[AOTG_DMA_BUF_CNT];
+	struct aotg_queue_pool queue_pool;
+	
+	struct aotg_hotplug hotplug;
 };
-
-extern void aotg_hcep_pool_init(struct aotg_hcd *acthcd);
 
 struct aotg_hcep
 {
@@ -333,7 +322,6 @@ struct aotg_hcep
 	void __iomem *reg_hcep_port;
 	void __iomem *reg_hcep_splitcs;
 
-	unsigned int urb_enque_cnt;
 	unsigned int urb_endque_cnt;
 	unsigned int urb_stop_stran_cnt;
 	unsigned int urb_unlinked_cnt;
@@ -348,7 +336,6 @@ struct aotg_hcep
 	
 	
 	struct aotg_queue *q;
-
 	struct aotg_ring *ring;
 	struct list_head queue_td_list;
 	struct list_head enring_td_list;
@@ -376,15 +363,56 @@ struct aotg_hcep
 #define AOTG_IS_DMA_OUT(x) ((x) & AOTG_DMA_OUT_PREFIX)
 #define AOTG_GET_DMA_NUM(x) ((x) & AOTG_DMA_NUM_MASK)
 
-// caninos-xfer.c ------------------------------------------------------------//
 
-extern void release_fifo_slot(struct aotg_hcd *, struct aotg_hcep *);
+// caninos-ctrl.c ------------------------------------------------------------//
 
-extern ulong get_fifo_slot(struct aotg_hcd *, int size);
+extern int aotg_hcep_ctrl_submit(struct usb_hcd *hcd,
+	struct urb *urb, gfp_t mem_flags);
 
-extern void hcep_free(struct usb_hcd *, struct aotg_hcep *);
+extern void handle_hcep0_out(struct aotg_hcd *acthcd);
 
-extern int hcep_config(struct usb_hcd *, struct urb *, struct aotg_hcep *);
+extern void handle_hcep0_in(struct aotg_hcd *acthcd);
+
+extern void handle_hcep0_error(struct aotg_hcd *acthcd, int is_in);
+
+extern int start_setup_transfer(struct aotg_hcd *acthcd,
+	struct aotg_queue *q, struct aotg_hcep *ep);
+
+// caninos-hotplug.c ---------------------------------------------------------//
+
+extern void aotg_init_hotplug(struct aotg_hotplug *hotplug,
+	struct aotg_hcd *acthcd);
+
+extern void aotg_start_hotplug(struct aotg_hotplug *hotplug);
+
+extern void aotg_stop_hotplug(struct aotg_hotplug *hotplug);
+
+extern u32 aotg_hotplug_irq_handler(struct aotg_hotplug *hotplug);
+
+extern int aotg_hotplug_control(struct aotg_hotplug *hotplug,
+	u16 typeReq, u16 wValue, u16 wIndex, char *buf, u16 wLength);
+
+extern int aotg_hotplug_status_data(struct aotg_hotplug *hotplug, char *buf);
+
+// caninos-pool.c ------------------------------------------------------------//
+
+extern void aotg_hcd_pool_init(struct aotg_hcd *acthcd);
+
+extern struct aotg_queue *aotg_hcd_queue_alloc(struct aotg_hcd *acthcd);
+
+extern void aotg_hcd_queue_free(struct aotg_hcd *acthcd, struct aotg_queue *q);
+
+// caninos-ep.c --------------------------------------------------------------//
+
+extern int aotg_hcep_alloc(struct usb_hcd*, struct urb*);
+
+extern void aotg_hcep_free(struct usb_hcd*, struct aotg_hcep*);
+
+extern void release_fifo_slot(struct aotg_hcd*, struct aotg_hcep*);
+
+extern const char* aotg_hcep_get_type_string(struct aotg_hcep*);
+
+extern const char* aotg_hcep_get_direction_string(struct aotg_hcep*);
 
 // -------------------------------------------------------------------------- //
 
@@ -430,7 +458,7 @@ static inline void ep_disable(struct aotg_hcep *ep) {
 	usb_clearbitsb(0x80, ep->reg_hcepcon);
 }
 
-extern int aotg_hcep_ctrl_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags);
+
 
 extern int aotg_hcep_intr_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags);
 
@@ -460,15 +488,8 @@ extern void aotg_clear_all_zeropkt_irq(struct aotg_hcd *acthcd);
 
 extern void aotg_clear_all_hcoutdma_irq(struct aotg_hcd *acthcd);
 
-extern void aotg_enable_irq(struct aotg_hcd *acthcd);
-
-extern void aotg_disable_irq(struct aotg_hcd *acthcd);
-
 extern void aotg_hcep_reset(struct aotg_hcd *acthcd, u8 ep_mask, u8 type_mask);
 
-extern void aotg_powergate_on(struct aotg_hcd *acthcd);
-
-extern void aotg_powergate_off(struct aotg_hcd *acthcd);
 
 extern int aotg_kmem_cache_create(void);
 
@@ -479,12 +500,7 @@ extern struct aotg_td *aotg_alloc_td(gfp_t mem_flags);
 extern void aotg_release_td(struct aotg_td *td);
 
 
-extern int caninos_usb_add_hcd(struct usb_hcd *hcd);
-
-extern void caninos_usb_hcd_remove(struct usb_hcd *hcd);
-
 extern struct usb_hcd *caninos_usb_create_hcd(struct device *dev);
-
 
 
 extern void enqueue_trb(struct aotg_ring *ring, u32 buf_ptr, u32 buf_len, u32 token);
@@ -492,9 +508,8 @@ extern void enqueue_trb(struct aotg_ring *ring, u32 buf_ptr, u32 buf_len, u32 to
 extern int ring_enqueue_sg_td(struct aotg_hcd *acthcd, struct aotg_ring *ring, struct aotg_td *td);
 
 
-void aotg_hcd_release_queue(struct aotg_hcd *acthcd, struct aotg_queue *q);
 void aotg_hub_trans_wait_timer(struct timer_list *t);
-enum hrtimer_restart aotg_hub_hotplug_timer(struct hrtimer *hrtimer);
+
 void aotg_check_trb_timer(struct timer_list *t);
 void aotg_power_onoff(int id, int on_off);
 void aotg_hcd_dump_td(struct aotg_ring *ring, struct aotg_td *td);

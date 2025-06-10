@@ -15,22 +15,15 @@ int aotg_hcep_intr_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	
 	spin_lock_irqsave(&acthcd->lock, flags);
 	
-	if (!(acthcd->port & USB_PORT_STAT_ENABLE) ||
-	    !(HC_IS_RUNNING(hcd->state)) ||
-	    (acthcd->port & (USB_PORT_STAT_C_CONNECTION << 16)) ||
-	    (acthcd->hcd_exiting != 0) || (acthcd->inserted == 0))
-	{
-		spin_unlock_irqrestore(&acthcd->lock, flags);
-		dev_err(acthcd->dev, "%s: device removed\n", __func__);
-		return -ENODEV;
-	}
+	
 	
 	retval = usb_hcd_link_urb_to_ep(hcd, urb);
 	
 	if (retval)
 	{
 		spin_unlock_irqrestore(&acthcd->lock, flags);
-		dev_err(acthcd->dev, "%s: unable to link urb to ep\n", __func__);
+		dev_err(acthcd->dev, "%s: usb_hcd_link_urb_to_ep() returned %d\n",
+		        __func__, retval);
 		return retval;
 	}
 	
@@ -38,62 +31,19 @@ int aotg_hcep_intr_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	
 	if (first_time)
 	{
-		ep = kzalloc(sizeof(*ep), GFP_ATOMIC);
-		
-		if (!ep)
-		{
-			usb_hcd_unlink_urb_from_ep(hcd, urb);
-			spin_unlock_irqrestore(&acthcd->lock, flags);
-			dev_err(acthcd->dev, "%s: unable to alloc hcep\n", __func__);
-			return -ENOMEM;
-		}
-		
-		retval = hcep_config(hcd, urb, ep);
+		retval = aotg_hcep_alloc(hcd, urb);
 		
 		if (retval)
 		{
 			usb_hcd_unlink_urb_from_ep(hcd, urb);
-			hcep_free(hcd, ep);
 			spin_unlock_irqrestore(&acthcd->lock, flags);
-			dev_err(acthcd->dev, "%s: config failed\n", __func__);
+			dev_err(acthcd->dev, "%s: aotg_hcep_alloc() returned %d\n",
+			        __func__, retval);
 			return retval;
-		}
-		
-		ep->ring = aotg_alloc_ring(acthcd, ep, INTR_TRBS, GFP_ATOMIC);
-		
-		if (!ep->ring)
-		{
-			usb_hcd_unlink_urb_from_ep(hcd, urb);
-			hcep_free(hcd, ep);
-			spin_unlock_irqrestore(&acthcd->lock, flags);
-			dev_err(acthcd->dev, "%s: alloc ring failed\n", __func__);
-			return -ENOMEM;
-		}
-		
-		INIT_LIST_HEAD(&ep->queue_td_list);
-		INIT_LIST_HEAD(&ep->enring_td_list);
-		INIT_LIST_HEAD(&ep->dering_td_list);
-		
-		urb->ep->hcpriv = ep;
-		
-		dev_info(acthcd->dev, "%s: ep %d %s, ptr 0x%llx, maxpacket %d\n", 
-		         __func__, ep->epnum, ep->is_out ? "out" : "in",
-		         (u64)(dma_addr_t) ep->hep, ep->maxpacket);
-	}
-	else
-	{
-		ep = urb->ep->hcpriv;
-		
-		if (ep->hep != urb->ep)
-		{
-			usb_hcd_unlink_urb_from_ep(hcd, urb);
-			spin_unlock_irqrestore(&acthcd->lock, flags);
-			dev_err(acthcd->dev, "%s: mismatch, ep %d %s\n",
-			        __func__, ep->epnum, ep->is_out ? "out" : "in");
-			return -EINVAL;
 		}
 	}
 	
+	ep = urb->ep->hcpriv;
 	urb->hcpriv = hcd;
 	
 	if (unlikely(ep->ring->intr_inited == 0))
@@ -105,8 +55,10 @@ int aotg_hcep_intr_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 			usb_hcd_unlink_urb_from_ep(hcd, urb);
 			
 			if (first_time) {
-				hcep_free(hcd, ep);
+				aotg_hcep_free(hcd, ep);
 			}
+			
+			urb->hcpriv = NULL;
 			
 			spin_unlock_irqrestore(&acthcd->lock, flags);
 			dev_err(acthcd->dev, "%s: ring enqueue intr failed\n", __func__);
@@ -116,7 +68,7 @@ int aotg_hcep_intr_submit(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 		ep->ring->intr_started = 0;
 	}
 	
-	ep->urb_enque_cnt++;
+	//ep->urb_enque_cnt++;
 	
 	list_for_each_entry_safe(td, next, &ep->enring_td_list, enring_list)
 	{

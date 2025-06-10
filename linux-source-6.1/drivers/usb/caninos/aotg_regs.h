@@ -357,7 +357,7 @@
 #define IN6CON                  0x00000036
 #define IN6CS                   0x00000037
 
-#if 1
+
 /***************  for 0-7 ep to 0-15 ep. *****************/
 #define INxIRQ                 0x00000188
 #define OUTxIRQ                0x0000018A
@@ -367,7 +367,7 @@
 #define OUTxIEN                0x00000196
 #define OUTxPNGIEN             0x0000019A
 
-#endif	/*  */
+
 #define     HCOUTxIRQ0          0x00000188
 #define     HCOUTxIRQ1          0x00000189
 #define     HCINxIRQ0           0x0000018A
@@ -393,28 +393,22 @@
 
 #define IVECT                   0x000001A0
 #define ENDPRST                 0x000001A2
-/*#define HCENDPRST               0x000001A2*/
+
 #define USBCS                   0x000001A3
 #define FRMNRL                  0x000001A4
 #define     FRMNRH              0x000001A5
-/*#define FRMNFH                  0x000001A5*/
+
 #define FNADDR                  0x000001A6
 #define CLKGATE                 0x000001A7
-/*#define FIFOCTRL                0x000001A8*/
-#define HCTRAINTERVAL		0x000001A8
+
+#define HCTRAINTERVAL     0x000001A8
 #define HCPORTCTRL              0x000001AB
 #define HCFRMNRL                0x000001AC
 #define HCFRMNRH                0x000001AD
 #define HCFRMREMAINL            0x000001AE
 #define HCFRMREMAINH            0x000001AF
 
-#if 0
-/************** ep0-7 to ep0-15 ******************/
-/*#define HCIN07ERRIRQ            0x000001B4
-#define HCOUT07ERRIRQ           0x000001B6
-#define HCIN07ERRIEN            0x000001B8
-#define HCOUT07ERRIEN           0x000001BA*/
-#endif
+
 #define     HCINxERRIRQ0            0x000001B4
 #define     HCINxERRIRQ1            0x000001B5
 #define     HCOUTxERRIRQ0           0x000001B6
@@ -432,7 +426,7 @@
 #define TAAIDLBDIS              0x000001C1
 #define TAWAITBCON              0x000001C2
 #define TBVBUSPLS               0x000001C3
-/*#define TBVBUSDISCHPLS          0x000001C7*/
+
 #define     TBVBUSDISPLS            0x000001C7
 
 #define     HCIN0MAXPCK         0x000001E0
@@ -630,83 +624,6 @@
 #define IN5STADDR               0x00000354
 #define IN6STADDR               0x00000358
 
-#if 0
-#define HCOUT0MAXPCK            0x000003E0
-#define HCOUT1MAXPCKL           0x000003E2
-#define HCOUT1MAXPCKH           0x000003E3
-#define HCOUT2MAXPCKL           0x000003E4
-#define HCOUT2MAXPCKH           0x000003E5
-#define HCOUT3MAXPCKL           0x000003E6
-#define HCOUT3MAXPCKH           0x000003E7
-#define HCOUT4MAXPCKL           0x000003E8
-#define HCOUT4MAXPCKH           0x000003E9
-#define HCOUT5MAXPCKL           0x000003EA
-#define HCOUT5MAXPCKH           0x000003EB
-
-/*#define USBERESET               0x00000400*/
-#define TA_BCON_COUNT           0x00000401
-#define VBUSDBCTIMERL           0x00000402
-#define VBUSDBCTIMERH           0x00000403
-#define VDCTRL                  0x00000404
-#define VDSTATE                 0x00000405
-#define BKDOOR                  0x00000406
-#define DBGMODE                 0x00000407
-#define SRPCTRL                 0x00000408
-/*#define USBEIRQ                 0x0000040A*/
-#define USBEIEN                 0x0000040C
-#define UDMAIRQ                 0x0000040E
-#define UDMAIEN                 0x0000040F
-#define OUTXSHORTPCKIRQ         0x00000410
-#define OUTXSHORTPCKIEN         0x00000412
-#define OUTXNAKCTRL             0x00000414
-#define HCINXSTART              0x00000416
-#define HCINXENDIRQ             0x00000418
-#define HCINXENDIEN             0x0000041A
-
-/* HCINxCounterŒÄŽæÆ÷µÄÐŽÈëµØÖ·Îª0x420,0x424,0x428,0x42c,0x430,¶ÁÈ¡µØÖ·Îª0x420£¬0x422,0x424,0x426,0x428¡£*/
-/*#define HCIN1_COUNTL            0x00000420
-#define HCIN1_COUNTH            0x00000421
-#define HCIN2_COUNTL            0x00000422
-#define HCIN2_COUNTH            0x00000423
-#define HCIN3_COUNTL            0x00000424
-#define HCIN3_COUNTH            0x00000425
-#define HCIN4_COUNTL            0x00000426
-#define HCIN4_COUNTH            0x00000427
-#define HCIN5_COUNTL            0x00000428
-#define HCIN5_COUNTH            0x00000429*/
-#define HCIN1_COUNTL            0x00000420
-#define HCIN1_COUNTH            0x00000421
-#define HCIN2_COUNTL            0x00000424
-#define HCIN2_COUNTH            0x00000425
-#define HCIN3_COUNTL            0x00000428
-#define HCIN3_COUNTH            0x00000429
-#define HCIN4_COUNTL            0x0000042c
-#define HCIN4_COUNTH            0x0000042d
-#define HCIN5_COUNTL            0x00000430
-#define HCIN5_COUNTH            0x00000431
-
-#define INXBUFEMPTYIRQ          0x00000440
-#define INXBUFEMPTYIEN          0x00000442
-#define INXBUFEMPTYCTRL         0x00000444
-#define UDMA1MEMADDR            0x00000450
-#define UDMA1EPSEL              0x00000454
-#define UDMA1COM                0x00000455
-#define UDMA1CNTL               0x00000458
-#define UDMA1CNTM               0x00000459
-#define UDMA1CNTH               0x0000045A
-#define UDMA1REML               0x0000045C
-#define UDMA1REMM               0x0000045D
-#define UDMA1REMH               0x0000045E
-#define UDMA2MEMADDR            0x00000460
-#define UDMA2EPSEL              0x00000464
-#define UDMA2COM                0x00000465
-#define UDMA2CNTL               0x00000468
-#define UDMA2CNTM               0x00000469
-#define UDMA2CNTH               0x0000046A
-#define UDMA2REML               0x0000046C
-#define UDMA2REMM               0x0000046D
-#define UDMA2REMH               0x0000046E
-#endif
 
 #define     HCIN1STADDR         0x00000304
 #define     HCIN2STADDR         0x00000308
