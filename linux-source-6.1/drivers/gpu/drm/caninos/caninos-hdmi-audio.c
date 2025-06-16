@@ -35,9 +35,8 @@
 #include "hdmi-regs.h"
 
 #define SPDIF_HDMI_CTL 0x10
-#define	HDMFR  1  // hdmi fifo reset
+#define HDMFR  1  // hdmi fifo reset
 #define HDMFDEN 8 // fifo drq enable
-
 #define HDMI_DAT 0x20;
 
 struct snd_hdmi_caninos
@@ -49,12 +48,15 @@ struct snd_hdmi_caninos
 	struct snd_card *card;
 	struct snd_pcm *pcm;
 	
+	struct mutex current_stream_lock;
+	struct snd_pcm_substream *current_stream;
+	
 	struct dma_chan *txchan;
 	struct dma_chan *rxchan;
-
+	
 	struct clk *tx_clk;
 	struct clk *pll_clk;
-
+	
 	int volume_left;
 	int volume_right;
 	
@@ -63,30 +65,69 @@ struct snd_hdmi_caninos
 	phys_addr_t phys_base;
 };
 
-static void caninos_set_rate(struct snd_hdmi_caninos *chip)
+int caninos_snd_hdmi_abort(struct snd_hdmi_caninos *chip)
 {
-	unsigned long reg_val;
-	int rate;
+	mutex_lock(&chip->current_stream_lock);
 	
-	rate = 48000;
-	reg_val = 49152000;
+	if (chip->current_stream && chip->current_stream->runtime &&
+		snd_pcm_running(chip->current_stream))
+	{
+		dev_err(chip->dev, "HDMI display disabled, aborting playback\n");
+		snd_pcm_stream_lock_irq(chip->current_stream);
+		snd_pcm_stop(chip->current_stream, SNDRV_PCM_STATE_DISCONNECTED);
+		snd_pcm_stream_unlock_irq(chip->current_stream);
+	}
 	
-	clk_set_rate(chip->pll_clk, reg_val);
-	clk_prepare_enable(chip->pll_clk);
-	clk_set_rate(chip->tx_clk, rate << 7);
-	clk_prepare_enable(chip->tx_clk);
+	mutex_unlock(&chip->current_stream_lock);
+	return 0;
 }
 
-static void caninos_audio_enable(struct snd_hdmi_caninos *chip)
+static int caninos_audio_start(struct snd_pcm_substream *substream)
 {
-	writel(readl(chip->base) | BIT(HDMFR) | BIT(HDMFDEN), chip->base + SPDIF_HDMI_CTL);
-	chip->hdmi->ops.audio_enable(chip->hdmi);
+	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
+	int err = chip->hdmi->ops.audio_start(chip->hdmi);
+	
+	if (!err)
+	{
+		u32 aux = readl(chip->base);
+		aux |= (BIT(HDMFR) | BIT(HDMFDEN));
+		writel(aux, chip->base + SPDIF_HDMI_CTL);
+	}
+	return err;
 }
 
-static void caninos_audio_disable(struct snd_hdmi_caninos *chip)
+static void caninos_audio_stop(struct snd_pcm_substream *substream)
 {
-	writel(readl(chip->base) & ~BIT(HDMFR) & ~BIT(HDMFDEN), chip->base + SPDIF_HDMI_CTL);
-	chip->hdmi->ops.audio_disable(chip->hdmi);
+	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
+	u32 aux;
+	
+	aux = readl(chip->base);
+	aux &= ~(BIT(HDMFR) | BIT(HDMFDEN));
+	writel(aux, chip->base + SPDIF_HDMI_CTL);
+	
+	chip->hdmi->ops.audio_stop(chip->hdmi);
+}
+
+static void caninos_audio_startup(struct snd_pcm_substream *substream)
+{
+	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
+	
+	mutex_lock(&chip->current_stream_lock);
+	chip->current_stream = substream;
+	mutex_unlock(&chip->current_stream_lock);
+	
+	chip->hdmi->ops.audio_startup(chip->hdmi);
+}
+
+static void caninos_audio_shutdown(struct snd_pcm_substream *substream)
+{
+	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
+	
+	mutex_lock(&chip->current_stream_lock);
+	chip->current_stream = NULL;
+	mutex_unlock(&chip->current_stream_lock);
+	
+	chip->hdmi->ops.audio_shutdown(chip->hdmi);
 }
 
 static int caninos_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
@@ -94,20 +135,23 @@ static int caninos_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
 	int err;
 	
+	WARN_ON(chip->current_stream != substream);
+	
 	switch (cmd)
 	{
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			caninos_audio_enable(chip);
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		err = caninos_audio_start(substream);
+		if (err) {
+			return err;
 		}
 		break;
 		
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			caninos_audio_disable(chip);
-		}
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		caninos_audio_stop(substream);
 		break;
 	}
 	
@@ -115,13 +159,10 @@ static int caninos_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	
 	if (err)
 	{
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			caninos_audio_disable(chip);
-		}
+		caninos_audio_stop(substream);
 		pr_err("%s: snd_dmaengine_pcm_trigger returned %d\n", __func__, err);
 		return err;
 	}
-	
 	return 0;
 }
 
@@ -131,7 +172,6 @@ static int caninos_pcm_hw_params
 	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
 	struct dma_slave_config slave_config;
 	struct dma_chan *chan;
-
 	int err;
 	
 	memset(&slave_config, 0, sizeof(slave_config));
@@ -159,11 +199,26 @@ static int caninos_pcm_hw_params
 	return 0;
 }
 
-static int caninos_pcm_set_runtime_hwparams(struct snd_pcm_substream *substream)
+static void caninos_set_rate(struct snd_hdmi_caninos *chip)
 {
-	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_pcm_hardware hw;
+	unsigned long reg_val;
+	int rate;
+	
+	rate = 48000;
+	reg_val = 49152000;
+	
+	clk_set_rate(chip->pll_clk, reg_val);
+	clk_prepare_enable(chip->pll_clk);
+	clk_set_rate(chip->tx_clk, rate << 7);
+	clk_prepare_enable(chip->tx_clk);
+}
 
+static int caninos_pcm_open(struct snd_pcm_substream *substream)
+{
+	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
+	struct snd_pcm_hardware hw;
+	int err;
+	
 	memset(&hw, 0, sizeof(hw));
 	
 	hw.info = SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID |
@@ -172,36 +227,19 @@ static int caninos_pcm_set_runtime_hwparams(struct snd_pcm_substream *substream)
 	
 	hw.periods_min = 1;
 	hw.periods_max = 1024;
-	
 	hw.period_bytes_min = 64;
 	hw.period_bytes_max = 64*1024;
 	hw.buffer_bytes_max = 64*1024;
-	
 	hw.fifo_size = 0;
-	
 	hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
-	
 	hw.rates = SNDRV_PCM_RATE_48000;
-	
 	hw.rate_min = 48000;
 	hw.rate_max = 48000;
-	
 	hw.channels_min = 2;
 	hw.channels_max = 2;
 	
-	runtime->hw = hw;
-
-	return 0;
-}
-
-static int caninos_pcm_open(struct snd_pcm_substream *substream)
-{
-	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
-	int err;
-
-	caninos_pcm_set_runtime_hwparams(substream);
-	chip->hdmi->ops.set_audio_interface(chip->hdmi);
-		
+	substream->runtime->hw = hw;
+	
 	err = snd_dmaengine_pcm_open(substream, chip->txchan);
 	
 	if (err) {
@@ -209,7 +247,19 @@ static int caninos_pcm_open(struct snd_pcm_substream *substream)
 		return err;
 	}
 	
+	caninos_audio_startup(substream);
 	return 0;
+}
+
+static int caninos_pcm_close(struct snd_pcm_substream *substream)
+{
+	struct snd_hdmi_caninos *chip = snd_pcm_chip(substream->pcm);
+	
+	WARN_ON(chip->current_stream != substream);
+	
+	caninos_audio_shutdown(substream);
+	
+	return snd_dmaengine_pcm_close(substream);
 }
 
 static int caninos_pcm_prepare(struct snd_pcm_substream *substream)
@@ -219,7 +269,7 @@ static int caninos_pcm_prepare(struct snd_pcm_substream *substream)
 
 static struct snd_pcm_ops caninos_pcm_ops = {
 	.open = caninos_pcm_open,
-	.close = snd_dmaengine_pcm_close,
+	.close = caninos_pcm_close,
 	.ioctl = snd_pcm_lib_ioctl,
 	.hw_params = caninos_pcm_hw_params,
 	.hw_free = snd_pcm_lib_free_pages,
@@ -294,6 +344,8 @@ static int snd_caninos_probe(struct platform_device *pdev)
 	chip = card->private_data;
 	chip->card = card;
 	chip->dev = dev;
+	chip->current_stream = NULL;
+	mutex_init(&chip->current_stream_lock);
 	
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	
@@ -357,7 +409,7 @@ static int snd_caninos_probe(struct platform_device *pdev)
 		snd_card_free(card);
 		return -EPROBE_DEFER;
 	}
-
+	
 	chip->txchan = dma_request_slave_channel(dev, "hdmi-tx");
 	
 	if (!chip->txchan)
@@ -371,7 +423,7 @@ static int snd_caninos_probe(struct platform_device *pdev)
 	strcpy(card->shortname, "Caninos HDMI Soundcard");
 	strcpy(card->longname, "Caninos HDMI Soundcard");
 	
-	/* Create a playback and capture pcm device */
+	/* Create a playback only pcm device */
 	err = snd_pcm_new(chip->card, "Caninos HDMI PCM", 0, 1, 0, &pcm);
 	
 	if (err < 0)
@@ -405,24 +457,24 @@ static int snd_caninos_probe(struct platform_device *pdev)
 		snd_card_free(card);
 		return err;
 	}
-		
+	
 	err = snd_card_register(card);
 	
-	if (err == 0)
+	if (err)
 	{
-		platform_set_drvdata(pdev, card);
-		return 0;
-	}
-	else
-	{
+		dev_err(dev, "snd_card_register() failed");
 		snd_card_free(card);
 		return err;
 	}
+	
+	platform_set_drvdata(pdev, chip);
+	return 0;
 }
 
 static int snd_caninos_remove(struct platform_device *pdev)
 {
-	struct snd_card *card = platform_get_drvdata(pdev);
+	struct snd_hdmi_caninos *chip = platform_get_drvdata(pdev);
+	struct snd_card *card = !chip ? NULL : chip->card;
 	
 	if (card) {
 		snd_card_free(card);

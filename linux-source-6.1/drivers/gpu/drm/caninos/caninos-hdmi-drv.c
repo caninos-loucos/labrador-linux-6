@@ -55,180 +55,7 @@ int caninos_hdmi_disable(struct caninos_hdmi *hdmi)
 	return 0;
 }
 
-int caninos_hdmi_set_mode(struct caninos_hdmi *hdmi, enum hdmi_vid_table vid)
-{
-	struct videomode mode = {0};
-	
-	switch (vid)
-	{
-	case VID640x480P_60_4VS3:
-		
-		mode.xres = 640;
-		mode.yres = 480;
-		mode.refresh = 60;
-    	mode.pixclock = 39721;
-		mode.hfp = 16;
-		mode.hsw = 96;
-		mode.hbp = 48;
-		mode.vfp = 10;
-		mode.vsw = 2;
-		mode.vbp = 33;
-		mode.sync = 0;
-		
-		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
-		hdmi->vid = VID640x480P_60_4VS3;
-		hdmi->mode = mode;
-		hdmi->interlace = false;
-		hdmi->vstart = 1;
-		hdmi->repeat = false;
-		
-		break;
-		
-	case VID720x480P_60_4VS3:
-		
-		mode.xres = 720;
-		mode.yres = 480;
-		mode.refresh = 60;
-		mode.pixclock = 37000;
-		mode.hfp = 16;
-		mode.hbp = 60;
-		mode.vfp = 9;
-		mode.vbp = 30;
-		mode.hsw = 62;
-		mode.vsw = 6;
-		mode.sync = 0;
-		
-		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
-		hdmi->vid = VID720x480P_60_4VS3;
-		hdmi->mode = mode;
-		hdmi->interlace = false;
-		hdmi->vstart = 7;
-		hdmi->repeat = false;
-		
-		break;
-		
-	case VID720x576P_50_4VS3:
-		
-		mode.xres = 720;
-		mode.yres = 576;
-		mode.refresh = 50;
-		mode.pixclock = 37037;
-		mode.hfp = 12;
-		mode.hbp = 68;
-		mode.vfp = 5;
-		mode.vbp = 39;
-		mode.hsw = 64;
-		mode.vsw = 5;
-		mode.sync = 0;
-		
-		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
-		hdmi->vid = VID720x576P_50_4VS3;
-		hdmi->mode = mode;
-		hdmi->interlace = false;
-		hdmi->vstart = 1;
-		hdmi->repeat = false;
-		
-		break;
-		
-	case VID1280x720P_60_16VS9:
-		
-		mode.xres = 1280;
-		mode.yres = 720;
-		mode.refresh = 60;
-		mode.pixclock = 13468;
-		mode.hfp = 110;
-		mode.hsw = 40;
-		mode.hbp = 220;
-		mode.vfp = 5;
-		mode.vsw = 5;
-		mode.vbp = 20;
-		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
-		
-		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
-		hdmi->vid = VID1280x720P_60_16VS9;
-		hdmi->mode = mode;
-		hdmi->interlace = false;
-		hdmi->vstart = 1;
-		hdmi->repeat = false;
-		
-		break;
-	
-	case VID1280x720P_50_16VS9:
-		
-		mode.xres = 1280;
-		mode.yres = 720;
-		mode.refresh = 50;
-		mode.pixclock = 13468;
-		mode.hfp = 440;
-		mode.hbp = 220;
-		mode.vfp = 5;
-		mode.vbp = 20;
-		mode.hsw = 40;
-		mode.vsw = 5;
-		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
-		
-		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
-		hdmi->vid = VID1280x720P_50_16VS9;
-		hdmi->mode = mode;
-		hdmi->interlace = false;
-		hdmi->vstart = 1;
-		hdmi->repeat = false;
-		
-		break;
-		
-		
-	case VID1920x1080P_50_16VS9:
-		
-		mode.xres = 1920;
-		mode.yres = 1080;
-		mode.refresh = 50;
-		mode.pixclock = 6734;
-		mode.hfp = 528;
-		mode.hbp = 148;
-		mode.vfp = 4;
-		mode.vbp = 36;
-		mode.hsw = 44;
-		mode.vsw = 5;
-		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
-		
-		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
-		hdmi->vid = VID1920x1080P_50_16VS9;
-		hdmi->mode = mode;
-		hdmi->interlace = false;
-		hdmi->vstart = 1;
-		hdmi->repeat = false;
-		
-		break;
-		
-	case VID1920x1080P_60_16VS9:
-		
-		mode.xres = 1920;
-		mode.yres = 1080;
-		mode.refresh = 60;
-		mode.pixclock = 6734;
-		mode.hfp = 88;
-		mode.hsw = 44;
-		mode.hbp = 148;
-		mode.vfp = 4;
-		mode.vsw = 5;
-		mode.vbp = 36;
-		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
-		
-		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
-		hdmi->vid = VID1920x1080P_60_16VS9;
-		hdmi->mode = mode;
-		hdmi->interlace = false;
-		hdmi->vstart = 1;
-		hdmi->repeat = false;
-		
-		break;
-		
-	default:
-		return -EINVAL;
-	}
-	
-	return 0;
-}
+
 
 #define PACKET_PERIOD 1
 
@@ -639,14 +466,18 @@ static int caninos_packet_generate(struct caninos_hdmi *hdmi, uint32_t no, uint8
 	return 0;
 }
 
-static bool caninos_is_video_enabled(struct caninos_hdmi *hdmi)
+static bool hdmi_is_video_enabled_raw(struct caninos_hdmi *hdmi)
 {
 	return (caninos_hdmi_readl(hdmi, HDMI_CR) & 0x01) != 0;
 }
 
-static void caninos_video_disable(struct caninos_hdmi *hdmi)
+static void hdmi_video_disable_raw(struct caninos_hdmi *hdmi)
 {
 	uint32_t val;
+	
+	val = caninos_hdmi_readl(hdmi, HDMI_ICR);
+	val &= ~BIT(25);
+	caninos_hdmi_writel(hdmi, HDMI_ICR, val);
 	
 	val = caninos_hdmi_readl(hdmi, HDMI_TX_2);
 	val = REG_SET_VAL(val, 0x0, 11, 8);
@@ -733,7 +564,7 @@ static void __caninos_phy_enable(struct caninos_hdmi *hdmi)
 	/* do not enable HDMI lane util video enable */
 	val = hdmi->tx_2 & (~((0xf << 8) | (1 << 17)));
 	caninos_hdmi_writel(hdmi, HDMI_TX_2, val);
-	udelay(500);
+	usleep_range(500, 550);
 	
 	/* TMDS Encoder */
 	val = caninos_hdmi_readl(hdmi, TMDS_EODR0);
@@ -751,14 +582,14 @@ static void __caninos_pll_enable(struct caninos_hdmi *hdmi)
 	val = readl(hdmi->cmu_base + hdmi->hwdiff->pll_reg);
 	val |= (1 << hdmi->hwdiff->pll_24m_en);
 	writel(val, hdmi->cmu_base + hdmi->hwdiff->pll_reg);
-	mdelay(1);
+	usleep_range(1000, 1500);
 	
 	/* set PLL, only bit18:16 of pll_val is used */
 	val = readl(hdmi->cmu_base + hdmi->hwdiff->pll_reg);
 	val &= ~(0x7 << 16);
 	val |= (hdmi->pll_val & (0x7 << 16));
 	writel(val, hdmi->cmu_base + hdmi->hwdiff->pll_reg);
-	mdelay(1);
+	usleep_range(1000, 1500);
 	
 	/* set debug PLL */
 	writel(hdmi->pll_debug0_val, hdmi->cmu_base + hdmi->hwdiff->pll_debug0_reg);
@@ -768,7 +599,7 @@ static void __caninos_pll_enable(struct caninos_hdmi *hdmi)
 	val = readl(hdmi->cmu_base + hdmi->hwdiff->pll_reg);
 	val |= (1 << hdmi->hwdiff->pll_en);
 	writel(val, hdmi->cmu_base + hdmi->hwdiff->pll_reg);
-	mdelay(1);
+	usleep_range(1000, 1500);
 	
 	if (hdmi->hwdiff->model == HDMI_MODEL_K7)
 	{
@@ -836,7 +667,84 @@ static void __caninos_video_format_config(struct caninos_hdmi *hdmi)
 	caninos_hdmi_writel(hdmi, HDMI_VICTL, val);
 }
 
-static int caninos_video_enable(struct caninos_hdmi *hdmi)
+static void hdmi_audio_start_raw(struct caninos_hdmi *hdmi)
+{
+	u32 val = caninos_hdmi_readl(hdmi, HDMI_ICR);
+	val |= BIT(25);
+	caninos_hdmi_writel(hdmi, HDMI_ICR, val);
+}
+
+static void hdmi_audio_stop_raw(struct caninos_hdmi *hdmi)
+{
+	u32 val = caninos_hdmi_readl(hdmi, HDMI_ICR);
+	val &= ~BIT(25);
+	caninos_hdmi_writel(hdmi, HDMI_ICR, val);
+}
+
+static void hdmi_audio_startup_raw(struct caninos_hdmi *hdmi)
+{
+	u32 tmp03, tmp47, CRP_N = 0;
+	u32 ASPCR = 0;
+	u32 ACACR = 0;
+	
+	caninos_hdmi_writel(hdmi, HDMI_ACRPCR, 
+		caninos_hdmi_readl(hdmi, HDMI_ACRPCR) | BIT(31));
+	caninos_hdmi_readl(hdmi, HDMI_ACRPCR); // flush write buffer
+	
+	tmp03 = caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE0TO3);
+	tmp03 &= ~(0xf << 24);
+	
+	tmp47 = caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE4TO7);
+	tmp47 &= ~(0xf << 4);
+	tmp47 |= 0xb;
+	
+	/* assume 48KHz samplerate */
+	tmp03 |= 0x2 << 24;
+	tmp47 |= 0xd << 4;
+	CRP_N = 6144;
+	
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE0TO3, tmp03);
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE4TO7, tmp47);
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE8TO11, 0x0);
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE12TO15, 0x0);
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE16TO19, 0x0);
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE20TO23, 0x0);
+	
+	// assume 2 channels: channels 1 and 2
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTASCN, 0x20001);
+	
+	//Sample size = 24b */
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE4TO7, 
+		(caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE4TO7) & ~0xf));
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE4TO7, 
+		caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE4TO7) | 0xb);
+	
+	// Assume audio is in IEC-60958 format, 2 channels
+	ASPCR = 0x11;
+	ACACR = 0xfac688;
+	
+	/* enable Audio FIFO_FILL  disable wait cycle */
+	caninos_hdmi_writel(hdmi, HDMI_CR,
+		caninos_hdmi_readl(hdmi, HDMI_CR) | 0x50);
+	
+	caninos_hdmi_writel(hdmi, HDMI_ASPCR, ASPCR);
+	caninos_hdmi_writel(hdmi, HDMI_ACACR, ACACR);
+	
+	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE0TO3,
+		caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE0TO3) & ~0x3);
+	caninos_hdmi_writel(hdmi, HDMI_ASPCR,
+		caninos_hdmi_readl(hdmi, HDMI_ASPCR) & ~(0xff << 23));
+	
+	caninos_hdmi_writel(hdmi, HDMI_ACRPCR, CRP_N | (0x1 << 31));
+	
+	hdmi_packet_gen_infoframe(hdmi);
+	
+	/* enable CRP */
+	caninos_hdmi_writel(hdmi, HDMI_ACRPCR, 
+		caninos_hdmi_readl(hdmi, HDMI_ACRPCR) & ~(0x1 << 31));
+}
+
+static int hdmi_video_enable_raw(struct caninos_hdmi *hdmi)
 {
 	uint32_t val, mode;
 	int preline, ret;
@@ -850,7 +758,7 @@ static int caninos_video_enable(struct caninos_hdmi *hdmi)
 	__caninos_phy_enable(hdmi);
 	__caninos_pll_enable(hdmi);
 	
-	mdelay(10);
+	usleep_range(10000, 15000);
 	
 	__caninos_video_timing_config(hdmi);
 	__caninos_video_format_config(hdmi);
@@ -997,7 +905,6 @@ static int caninos_video_enable(struct caninos_hdmi *hdmi)
 	
 	caninos_hdmi_writel(hdmi, HDMI_SCHCR, val);
 	
-	
 	val = caninos_hdmi_readl(hdmi, HDMI_SCHCR);
 	val = REG_SET_VAL(val, hdmi->settings.bit_invert, 28, 28);
 	val = REG_SET_VAL(val, hdmi->settings.channel_invert, 29, 29);
@@ -1048,79 +955,294 @@ static int caninos_video_enable(struct caninos_hdmi *hdmi)
 	return 0;
 }
 
-static void caninos_audio_enable(struct caninos_hdmi *hdmi)
+static bool caninos_is_video_enabled(struct caninos_hdmi *hdmi)
 {
-	u32 val = caninos_hdmi_readl(hdmi, HDMI_ICR);
-	val |= BIT(25);
-	caninos_hdmi_writel(hdmi, HDMI_ICR, val);
+	bool retval;
+	mutex_lock(&hdmi->lock);
+	
+	retval = hdmi_is_video_enabled_raw(hdmi);
+	
+	mutex_unlock(&hdmi->lock);
+	return retval;
 }
 
-static void caninos_audio_disable(struct caninos_hdmi *hdmi)
+static void caninos_audio_startup(struct caninos_hdmi *hdmi)
 {
-	u32 val = caninos_hdmi_readl(hdmi, HDMI_ICR);
-	val &= ~BIT(25);
-	caninos_hdmi_writel(hdmi, HDMI_ICR, val);
+	mutex_lock(&hdmi->lock);
+	
+	if (hdmi_is_video_enabled_raw(hdmi))
+	{
+		hdmi_audio_stop_raw(hdmi);
+		hdmi_audio_startup_raw(hdmi);
+		hdmi_audio_start_raw(hdmi);
+		hdmi->audio_active = true;
+	}
+	else {
+		hdmi->audio_active = false;
+	}
+	
+	mutex_unlock(&hdmi->lock);
 }
 
-static void caninos_set_audio_interface(struct caninos_hdmi *hdmi)
+static void caninos_audio_shutdown(struct caninos_hdmi *hdmi)
 {
-	u32 tmp03, tmp47, CRP_N = 0;
-	u32 ASPCR = 0;
-	u32 ACACR = 0;
+	mutex_lock(&hdmi->lock);
+	
+	if (hdmi->audio_active)
+	{
+		if (hdmi_is_video_enabled_raw(hdmi)) {
+			hdmi_audio_stop_raw(hdmi);
+		}
+		hdmi->audio_active = false;
+	}
+	
+	mutex_unlock(&hdmi->lock);
+}
 
-	hdmi->ops.audio_disable(hdmi);
+static int caninos_audio_start(struct caninos_hdmi *hdmi)
+{
+	int retval = 0;
+	
+	mutex_lock(&hdmi->lock);
+	
+	if (hdmi->audio_active) {
+		hdmi_audio_start_raw(hdmi);
+	}
+	else if (hdmi_is_video_enabled_raw(hdmi))
+	{
+		hdmi_audio_stop_raw(hdmi);
+		hdmi_audio_startup_raw(hdmi);
+		hdmi_audio_start_raw(hdmi);
+		hdmi->audio_active = true;
+	}
+	else {
+		retval = -ENODEV;
+	}
+	
+	mutex_unlock(&hdmi->lock);
+	
+	return retval;
+}
 
-	caninos_hdmi_writel(hdmi, HDMI_ACRPCR, caninos_hdmi_readl(hdmi, HDMI_ACRPCR) | BIT(31));
-	caninos_hdmi_readl(hdmi, HDMI_ACRPCR); // flush write buffer
+static void caninos_audio_stop(struct caninos_hdmi *hdmi)
+{
+	mutex_lock(&hdmi->lock);
+	
+	if (hdmi->audio_active) {
+		hdmi_audio_stop_raw(hdmi);
+	}
+	
+	mutex_unlock(&hdmi->lock);
+}
 
-	tmp03 = caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE0TO3);
-	tmp03 &= ~(0xf << 24);
+static int caninos_video_enable(struct caninos_hdmi *hdmi)
+{
+	int retval;
+	mutex_lock(&hdmi->lock);
+	
+	if (hdmi_is_video_enabled_raw(hdmi))
+	{
+		hdmi_audio_stop_raw(hdmi);
+		hdmi->audio_active = false;
+		hdmi_video_disable_raw(hdmi);
+	}
+	
+	retval = hdmi_video_enable_raw(hdmi);
+	
+	mutex_unlock(&hdmi->lock);
+	return retval;
+}
 
-	tmp47 = caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE4TO7);
-	tmp47 &= ~(0xf << 4);
-	tmp47 |= 0xb;
+static void caninos_video_disable(struct caninos_hdmi *hdmi)
+{
+	mutex_lock(&hdmi->lock);
+	
+	if (hdmi_is_video_enabled_raw(hdmi))
+	{
+		hdmi_audio_stop_raw(hdmi);
+		hdmi->audio_active = false;
+		hdmi_video_disable_raw(hdmi);
+	}
+	
+	mutex_unlock(&hdmi->lock);
+}
 
-	/* assume 48KHz samplerate */
-	tmp03 |= 0x2 << 24;
-	tmp47 |= 0xd << 4;
-	CRP_N = 6144;
-
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE0TO3, tmp03);
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE4TO7, tmp47);
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE8TO11, 0x0);
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE12TO15, 0x0);
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE16TO19, 0x0);
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE20TO23, 0x0);
-
-	// assume 2 channels: channels 1 and 2
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTASCN, 0x20001);
-
-	//Sample size = 24b */
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE4TO7, (caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE4TO7) & ~0xf));
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE4TO7, caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE4TO7) | 0xb);
-
-	// Assume audio is in IEC-60958 format, 2 channels
-	ASPCR = 0x11;
-	ACACR = 0xfac688;
-
-	/* enable Audio FIFO_FILL  disable wait cycle */
-	caninos_hdmi_writel(hdmi, HDMI_CR, caninos_hdmi_readl(hdmi, HDMI_CR) | 0x50);
-
-	caninos_hdmi_writel(hdmi, HDMI_ASPCR, ASPCR);
-	caninos_hdmi_writel(hdmi, HDMI_ACACR, ACACR);
-     
-	caninos_hdmi_writel(hdmi, HDMI_AICHSTABYTE0TO3, caninos_hdmi_readl(hdmi, HDMI_AICHSTABYTE0TO3) & ~0x3);
-	caninos_hdmi_writel(hdmi, HDMI_ASPCR, caninos_hdmi_readl(hdmi, HDMI_ASPCR) & ~(0xff << 23));
-
-
-	caninos_hdmi_writel(hdmi, HDMI_ACRPCR, CRP_N | (0x1 << 31));
-
-	hdmi_packet_gen_infoframe(hdmi);
-
-    /* enable CRP */
-	caninos_hdmi_writel(hdmi, HDMI_ACRPCR, caninos_hdmi_readl(hdmi, HDMI_ACRPCR) & ~(0x1 << 31));
-
-	hdmi->ops.audio_enable(hdmi);
+int caninos_hdmi_set_mode(struct caninos_hdmi *hdmi, enum hdmi_vid_table vid)
+{
+	struct videomode mode = {0};
+	mutex_lock(&hdmi->lock);
+	
+	switch (vid)
+	{
+	case VID640x480P_60_4VS3:
+		
+		mode.xres = 640;
+		mode.yres = 480;
+		mode.refresh = 60;
+    	mode.pixclock = 39721;
+		mode.hfp = 16;
+		mode.hsw = 96;
+		mode.hbp = 48;
+		mode.vfp = 10;
+		mode.vsw = 2;
+		mode.vbp = 33;
+		mode.sync = 0;
+		
+		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
+		hdmi->vid = VID640x480P_60_4VS3;
+		hdmi->mode = mode;
+		hdmi->interlace = false;
+		hdmi->vstart = 1;
+		hdmi->repeat = false;
+		
+		break;
+		
+	case VID720x480P_60_4VS3:
+		
+		mode.xres = 720;
+		mode.yres = 480;
+		mode.refresh = 60;
+		mode.pixclock = 37000;
+		mode.hfp = 16;
+		mode.hbp = 60;
+		mode.vfp = 9;
+		mode.vbp = 30;
+		mode.hsw = 62;
+		mode.vsw = 6;
+		mode.sync = 0;
+		
+		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
+		hdmi->vid = VID720x480P_60_4VS3;
+		hdmi->mode = mode;
+		hdmi->interlace = false;
+		hdmi->vstart = 7;
+		hdmi->repeat = false;
+		
+		break;
+		
+	case VID720x576P_50_4VS3:
+		
+		mode.xres = 720;
+		mode.yres = 576;
+		mode.refresh = 50;
+		mode.pixclock = 37037;
+		mode.hfp = 12;
+		mode.hbp = 68;
+		mode.vfp = 5;
+		mode.vbp = 39;
+		mode.hsw = 64;
+		mode.vsw = 5;
+		mode.sync = 0;
+		
+		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
+		hdmi->vid = VID720x576P_50_4VS3;
+		hdmi->mode = mode;
+		hdmi->interlace = false;
+		hdmi->vstart = 1;
+		hdmi->repeat = false;
+		
+		break;
+		
+	case VID1280x720P_60_16VS9:
+		
+		mode.xres = 1280;
+		mode.yres = 720;
+		mode.refresh = 60;
+		mode.pixclock = 13468;
+		mode.hfp = 110;
+		mode.hsw = 40;
+		mode.hbp = 220;
+		mode.vfp = 5;
+		mode.vsw = 5;
+		mode.vbp = 20;
+		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
+		
+		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
+		hdmi->vid = VID1280x720P_60_16VS9;
+		hdmi->mode = mode;
+		hdmi->interlace = false;
+		hdmi->vstart = 1;
+		hdmi->repeat = false;
+		
+		break;
+	
+	case VID1280x720P_50_16VS9:
+		
+		mode.xres = 1280;
+		mode.yres = 720;
+		mode.refresh = 50;
+		mode.pixclock = 13468;
+		mode.hfp = 440;
+		mode.hbp = 220;
+		mode.vfp = 5;
+		mode.vbp = 20;
+		mode.hsw = 40;
+		mode.vsw = 5;
+		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
+		
+		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
+		hdmi->vid = VID1280x720P_50_16VS9;
+		hdmi->mode = mode;
+		hdmi->interlace = false;
+		hdmi->vstart = 1;
+		hdmi->repeat = false;
+		
+		break;
+		
+		
+	case VID1920x1080P_50_16VS9:
+		
+		mode.xres = 1920;
+		mode.yres = 1080;
+		mode.refresh = 50;
+		mode.pixclock = 6734;
+		mode.hfp = 528;
+		mode.hbp = 148;
+		mode.vfp = 4;
+		mode.vbp = 36;
+		mode.hsw = 44;
+		mode.vsw = 5;
+		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
+		
+		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
+		hdmi->vid = VID1920x1080P_50_16VS9;
+		hdmi->mode = mode;
+		hdmi->interlace = false;
+		hdmi->vstart = 1;
+		hdmi->repeat = false;
+		
+		break;
+		
+	case VID1920x1080P_60_16VS9:
+		
+		mode.xres = 1920;
+		mode.yres = 1080;
+		mode.refresh = 60;
+		mode.pixclock = 6734;
+		mode.hfp = 88;
+		mode.hsw = 44;
+		mode.hbp = 148;
+		mode.vfp = 4;
+		mode.vsw = 5;
+		mode.vbp = 36;
+		mode.sync = DSS_SYNC_HOR_HIGH_ACT | DSS_SYNC_VERT_HIGH_ACT;
+		
+		hdmi->settings.prelines = caninos_hdmi_calculate_preline(&mode);
+		hdmi->vid = VID1920x1080P_60_16VS9;
+		hdmi->mode = mode;
+		hdmi->interlace = false;
+		hdmi->vstart = 1;
+		hdmi->repeat = false;
+		
+		break;
+		
+	default:
+		mutex_unlock(&hdmi->lock);
+		return -EINVAL;
+	}
+	
+	mutex_unlock(&hdmi->lock);
+	return 0;
 }
 
 static bool caninos_cable_status(struct caninos_hdmi *hdmi)
@@ -1166,10 +1288,9 @@ static void caninos_hpd_disable(struct caninos_hdmi *hdmi)
 
 static void caninos_power_off(struct caninos_hdmi *hdmi)
 {
-	if (caninos_is_video_enabled(hdmi)) {
-		caninos_video_disable(hdmi);
+	if (hdmi_is_video_enabled_raw(hdmi)) {
+		hdmi_video_disable_raw(hdmi);
 	}
-	
 	reset_control_assert(hdmi->hdmi_rst);
 	clk_disable_unprepare(hdmi->hdmi_dev_clk);
 }
@@ -1183,10 +1304,9 @@ static int caninos_power_on(struct caninos_hdmi *hdmi)
 {
 	clk_prepare_enable(hdmi->hdmi_dev_clk);
 	
-	if (caninos_is_video_enabled(hdmi)) {
-		caninos_video_disable(hdmi);
+	if (hdmi_is_video_enabled_raw(hdmi)) {
+		hdmi_video_disable_raw(hdmi);
 	}
-	
 	reset_control_assert(hdmi->hdmi_rst);
 	usleep_range(5000, 6000);
 	reset_control_deassert(hdmi->hdmi_rst);
@@ -1267,6 +1387,8 @@ static int caninos_hdmi_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 	
+	mutex_init(&hdmi->lock);
+	
 	hdmi->hwdiff = devm_kzalloc(dev, sizeof(struct caninos_hdmi_hwdiff), GFP_KERNEL);
 	
 	if (!hdmi->hwdiff) {
@@ -1287,9 +1409,10 @@ static int caninos_hdmi_probe(struct platform_device *pdev)
 	hdmi->ops.video_enable = caninos_video_enable;
 	hdmi->ops.video_disable = caninos_video_disable;
 	hdmi->ops.is_video_enabled = caninos_is_video_enabled;
-	hdmi->ops.audio_disable = caninos_audio_disable;
-	hdmi->ops.audio_enable = caninos_audio_enable;
-	hdmi->ops.set_audio_interface = caninos_set_audio_interface;
+	hdmi->ops.audio_stop = caninos_audio_stop;
+	hdmi->ops.audio_start = caninos_audio_start;
+	hdmi->ops.audio_startup = caninos_audio_startup;
+	hdmi->ops.audio_shutdown = caninos_audio_shutdown;
 	hdmi->ops.packet_generate = caninos_packet_generate;
 	hdmi->ops.packet_send = caninos_packet_send;
 	

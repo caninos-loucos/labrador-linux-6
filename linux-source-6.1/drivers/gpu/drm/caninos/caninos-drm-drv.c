@@ -128,6 +128,10 @@ static void caninos_enable(struct drm_simple_display_pipe *pipe,
 	vdc_mode.height = height;
 	vdc_mode.format = DRM_FORMAT_XRGB8888;
 	
+	#ifdef CONFIG_DRM_CANINOS_HDMI_AUDIO
+	caninos_snd_hdmi_abort(priv->caninos_snd_hdmi);
+	#endif /* CONFIG_DRM_CANINOS_HDMI_AUDIO */
+	
 	caninos_hdmi_disable(caninos_hdmi);
 	
 	caninos_vdc_disable(caninos_vdc);
@@ -146,6 +150,11 @@ static void caninos_disable(struct drm_simple_display_pipe *pipe)
 	struct caninos_vdc *caninos_vdc = priv->caninos_vdc;
 	
 	drm_crtc_vblank_off(&pipe->crtc);
+	
+	#ifdef CONFIG_DRM_CANINOS_HDMI_AUDIO
+	caninos_snd_hdmi_abort(priv->caninos_snd_hdmi);
+	#endif /* CONFIG_DRM_CANINOS_HDMI_AUDIO */
+	
 	caninos_hdmi_disable(caninos_hdmi);
 	caninos_vdc_disable(caninos_vdc);
 }
@@ -361,6 +370,19 @@ static int caninos_drm_load(struct drm_device *drm)
 		dev_info(dev, "unable to get handle of video display controller\n");
 		return -EPROBE_DEFER;
 	}
+	
+	#ifdef CONFIG_DRM_CANINOS_HDMI_AUDIO
+	np = of_parse_phandle(dev->of_node, "hdmi-sndcard", 0);
+	
+	if (np) {
+		priv->caninos_snd_hdmi = caninos_get_drvdata_by_node(np);
+		of_node_put(np);
+	}
+	if (!priv->caninos_snd_hdmi) {
+		dev_info(dev, "unable to get handle of hdmi soundcard\n");
+		return -EPROBE_DEFER;
+	}
+	#endif /* CONFIG_DRM_CANINOS_HDMI_AUDIO */
 	
 	ret = caninos_mode_config_init(priv);
 	

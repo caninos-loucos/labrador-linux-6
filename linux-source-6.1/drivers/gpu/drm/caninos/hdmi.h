@@ -121,9 +121,10 @@ struct caninos_hdmi_ops
 	void (*video_disable)(struct caninos_hdmi *ip);
 	bool (*is_video_enabled)(struct caninos_hdmi *ip);
 	
-	void (*audio_enable)(struct caninos_hdmi *ip);
-	void (*audio_disable)(struct caninos_hdmi *ip);
-	void (*set_audio_interface)(struct caninos_hdmi *ip);
+	int  (*audio_start)(struct caninos_hdmi *ip);
+	void (*audio_stop)(struct caninos_hdmi *ip);
+	void (*audio_startup)(struct caninos_hdmi *ip);
+	void (*audio_shutdown)(struct caninos_hdmi *ip);
 	
 	int  (*packet_generate)(struct caninos_hdmi *ip, uint32_t no, uint8_t *pkt);
 	int  (*packet_send)(struct caninos_hdmi *ip, uint32_t no, int period);
@@ -176,6 +177,9 @@ struct caninos_hdmi
 	struct device *dev;
 	struct reset_control *hdmi_rst;
 	struct clk *hdmi_dev_clk;
+	struct mutex lock;
+	
+	bool audio_active;
 	
 	struct caninos_hdmi_settings settings;
 	int vid; /* video mode */

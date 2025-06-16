@@ -52,11 +52,14 @@ struct caninos_vdc;
 struct caninos_gfx;
 struct caninos_hdmi;
 
+#ifdef CONFIG_DRM_CANINOS_HDMI_AUDIO
+struct snd_hdmi_caninos;
+extern struct platform_driver caninos_hdmi_audio_plat_driver;
+extern int caninos_snd_hdmi_abort(struct snd_hdmi_caninos*);
+#endif /* CONFIG_DRM_CANINOS_HDMI_AUDIO */
+
 extern struct platform_driver caninos_vdc_plat_driver;
 extern struct platform_driver caninos_hdmi_plat_driver;
-#ifdef CONFIG_DRM_CANINOS_HDMI_AUDIO
-extern struct platform_driver caninos_hdmi_audio_plat_driver;
-#endif
 
 extern int caninos_hdmi_set_mode(struct caninos_hdmi*, enum hdmi_vid_table);
 

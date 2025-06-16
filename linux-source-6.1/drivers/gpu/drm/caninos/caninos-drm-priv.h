@@ -32,6 +32,9 @@ struct caninos_gfx
 	struct drm_connector connector;
 	struct caninos_hdmi *caninos_hdmi;
 	struct caninos_vdc *caninos_vdc;
+	#ifdef CONFIG_DRM_CANINOS_HDMI_AUDIO
+	struct snd_hdmi_caninos *caninos_snd_hdmi;
+	#endif /* CONFIG_DRM_CANINOS_HDMI_AUDIO */
 };
 
 #endif /* _CANINOS_DRM_PRIV_H_ */

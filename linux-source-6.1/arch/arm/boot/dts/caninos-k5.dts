@@ -646,7 +646,7 @@
 			status = "okay";
 		};
 		
-		hdmi-audio@b0100000 {
+		hdmi_audio: hdmi-audio@b0100000 {
 			compatible = "caninos,hdmi-audio";
 			reg = <0xb0100000 0x34>;
 			hdmi = <&hdmi>;
@@ -654,7 +654,7 @@
 			dma-names = "hdmi-tx";
 			clocks = <&cmu CLK_AUDIO_PLL>, <&cmu CLK_HDMI_AUDIO>;
 			clock-names = "audio-pll", "hdmia";
-			status = "disabled";
+			status = "okay";
 		};
 		
 		vdc: vdc@0xb02e0000 {
@@ -672,6 +672,7 @@
 		drm {
 			compatible = "caninos,drm";
 			hdmi-controller = <&hdmi>;
+			hdmi-sndcard = <&hdmi_audio>;
 			display-controller = <&vdc>;
 			memory-region = <&fb_reserved>;
 			status = "okay";
