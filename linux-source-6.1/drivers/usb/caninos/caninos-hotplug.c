@@ -13,17 +13,48 @@
 #define AOTG_PORT_FULL_SPEED BIT(2)
 #define AOTG_PORT_LOW_SPEED  BIT(3)
 
+// usbecs register
+#define USB2_ECS_VBUS_P0       BIT(10)
+#define USB2_ECS_ID_P0         BIT(12)
+#define USB2_ECS_DPPUEN_P0     BIT(3)
+#define USB2_ECS_DMPUEN_P0     BIT(2)
+#define USB2_ECS_DMPDDIS_P0    BIT(1)
+#define USB2_ECS_DPPDDIS_P0    BIT(0)
+#define USB2_ECS_SOFTIDEN_P0   BIT(26)
+#define USB2_ECS_SOFTID_P0     BIT(27)
+#define USB2_ECS_SOFTVBUSEN_P0 BIT(24)
+#define USB2_ECS_SOFTVBUS_P0   BIT(25)
+
+// OTG Control Register (for Host operation)
+#define USBH_OTGCTRL 0x1BE
+// Bit used for the core testing purpose.
+// It should be always written with zero.
+#define OTGCTRL_FORCEBCONN BIT(7)
+// Bit 6 is reserved.
+#define OTGCTRL_SRPDATDETEN     (1 << 5)
+#define OTGCTRL_SRPVBUSDETEN    (1 << 4)
+#define OTGCTRL_BHNPEN          (1 << 3)
+#define OTGCTRL_ASETBHNPEN      (1 << 2)
+// Bit 1 controls OTG FSM. It forces the bus power-down.
+#define OTGCTRL_ABUSDROP BIT(1)
+// Bit 0 is used to start or end the session
+// Meaning of this bit is, depending on id signal state, the same as a_bus_req
+// or b_bus_req bit from OTG Supplement Specification.
+#define OTGCTRL_BUSREQ BIT(0)
+
 static void hotplug_worker(struct work_struct *t);
 
-static void aotg_disable_irq(struct aotg_hotplug *hotplug);
+static void aotg_disable_bus(struct aotg_hotplug *hotplug);
 
-static void aotg_enable_irq(struct aotg_hotplug *hotplug);
+static int aotg_enable_bus(struct aotg_hotplug *hotplug);
 
 static int aotg_port_reset(struct aotg_hotplug *hotplug);
 
 static int aotg_hw_powerup(struct aotg_hotplug *hotplug);
 
 static void aotg_hw_shutdown(struct aotg_hotplug *hotplug);
+
+static int aotg_msleep(struct aotg_hotplug *hotplug, unsigned int msecs);
 
 void aotg_init_hotplug(struct aotg_hotplug *hotplug, struct aotg_hcd *acthcd)
 {
@@ -86,6 +117,14 @@ static int hotplug_procedure(struct aotg_hotplug *hotplug)
 	
 	atomic_set_release(&hotplug->rhstate, AOTG_RH_NOATTACHED);
 	
+	retval = aotg_enable_bus(hotplug);
+	
+	if (retval)
+	{
+		aotg_hw_shutdown(hotplug);
+		return retval;
+	}
+	
 	while (1)
 	{
 		msg = atomic_fetch_and_acquire(0, &hotplug->mailbox);
@@ -106,7 +145,7 @@ static int hotplug_procedure(struct aotg_hotplug *hotplug)
 		
 		wait_event_timeout(hotplug->event, 
 			atomic_read_acquire(&hotplug->mailbox) != 0,
-			msecs_to_jiffies(1200));
+			msecs_to_jiffies(600));
 	}
 	
 	dev_info(acthcd->dev, "%s: port reset\n", __func__);
@@ -160,6 +199,7 @@ static int hotplug_procedure(struct aotg_hotplug *hotplug)
 			msecs_to_jiffies(600));
 	}
 	
+	aotg_disable_bus(hotplug);
 	dev_info(acthcd->dev, "%s: device disconnected\n", __func__);
 	return 0;
 }
@@ -347,6 +387,24 @@ int aotg_hotplug_control(struct aotg_hotplug *hotplug,
 	return 0;
 }
 
+static int aotg_msleep(struct aotg_hotplug *hotplug, unsigned int msecs)
+{
+	long res = msecs_to_jiffies(msecs);
+	
+	do {
+		int msg = atomic_fetch_and_acquire(0, &hotplug->mailbox);
+		
+		if (msg & MSG_CANCEL) {
+			return -ECANCELED;
+		}
+		res = wait_event_timeout(hotplug->event, 
+			atomic_read_acquire(&hotplug->mailbox) != 0, res);
+		
+	} while (res > 0);
+	
+	return 0;
+}
+
 static int aotg_port_reset(struct aotg_hotplug *hotplug)
 {
 	struct aotg_hcd *acthcd = hotplug->acthcd;
@@ -363,7 +421,7 @@ static int aotg_port_reset(struct aotg_hotplug *hotplug)
 	// clear port status irq
 	writeb(USBIRQ_URES | USBIRQ_HS, acthcd->base + USBIRQ);
 	
-	// start port reset (needs at least 55ms)
+	// start port reset
 	writeb(BIT(6) | BIT(5), acthcd->base + HCPORTCTRL);
 	
 	spin_unlock_irqrestore(&hotplug->irq_lock, flags);
@@ -414,7 +472,7 @@ static int aotg_port_reset(struct aotg_hotplug *hotplug)
 	return -ETIMEDOUT;
 }
 
-static void aotg_disable_irq(struct aotg_hotplug *hotplug)
+static void aotg_disable_bus(struct aotg_hotplug *hotplug)
 {
 	struct aotg_hcd *acthcd = hotplug->acthcd;
 	unsigned long flags;
@@ -427,7 +485,12 @@ static void aotg_disable_irq(struct aotg_hotplug *hotplug)
 	// disable usb and otg irqs
 	usb_clearbitsb(USBEIRQ_USBIEN, acthcd->base + USBEIEN);
 	usb_clearbitsb(BIT(2), acthcd->base + OTGIEN);
-	usb_clearbitsb(OTGCTRL_BUSREQ, acthcd->base + OTGCTRL);
+	
+	// disable 15k pull-down on data line differential pair
+	usb_clearbitsl(USB2_ECS_DPPDDIS_P0 | USB2_ECS_DMPDDIS_P0, acthcd->usbecs);
+	
+	// free bus and end section
+	usb_clearbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
 	
 	// clear port status irq
 	writeb(USBIRQ_URES | USBIRQ_HS, acthcd->base + USBIRQ);
@@ -439,22 +502,49 @@ static void aotg_disable_irq(struct aotg_hotplug *hotplug)
 	spin_unlock_irqrestore(&hotplug->irq_lock, flags);
 }
 
-static void aotg_enable_irq(struct aotg_hotplug *hotplug)
+static int aotg_enable_bus(struct aotg_hotplug *hotplug)
 {
 	struct aotg_hcd *acthcd = hotplug->acthcd;
 	unsigned long flags;
 	
+	// request bus and start section
+	usb_setbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
+	
+	// enable 15k pull-down on data line differential pair
+	usb_setbitsl(USB2_ECS_DPPDDIS_P0 | USB2_ECS_DMPDDIS_P0, acthcd->usbecs);
+	
+	// wait 600ms
+	if (aotg_msleep(hotplug, 600))
+	{
+		// disable 15k pull-down on data line differential pair
+		usb_clearbitsl(USB2_ECS_DPPDDIS_P0 | USB2_ECS_DMPDDIS_P0,
+			acthcd->usbecs);
+		
+		// free bus and end section
+		usb_clearbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
+		
+		return -ECANCELED;
+	}
+	
 	spin_lock_irqsave(&hotplug->irq_lock, flags);
+	
+	// clear port status irq
+	writeb(USBIRQ_URES | USBIRQ_HS, acthcd->base + USBIRQ);
+	
+	// clear usb and otg irqs
+	writeb(USBEIRQ_USBIRQ, acthcd->base + USBEIRQ);
+	writeb(BIT(2), acthcd->base + OTGIRQ);
 	
 	// enable usb and otg irqs
 	usb_setbitsb(USBEIRQ_USBIEN, acthcd->base + USBEIEN);
 	usb_setbitsb(BIT(2), acthcd->base + OTGIEN);
-	usb_setbitsb(OTGCTRL_BUSREQ, acthcd->base + OTGCTRL);
 	
 	// enable port status irq
 	usb_setbitsb(USBIEN_URES | USBIEN_HS, acthcd->base + USBIEN);
 	
 	spin_unlock_irqrestore(&hotplug->irq_lock, flags);
+	
+	return 0;
 }
 
 u32 aotg_hotplug_irq_handler(struct aotg_hotplug *hotplug)
@@ -646,21 +736,41 @@ static void aotg_hw_setup(struct aotg_hotplug *hotplug)
 	
 	writel(0x1, acthcd->base + HCDMABCKDOOR);
 	
-	if (acthcd->model == CANINOS_HW_MODEL_K7) {
+	if (acthcd->model == CANINOS_HW_MODEL_K7)
+	{
+		//0x37000000
+		///0011 0111 0000 0000 0000 0000 0000 0000
+		//bit 24 -> 1   -> USB2_ECS_SOFTVBUSEN_P0
+		//bit 25 -> 1   -> USB2_ECS_SOFTVBUS_P0
+		//bit 26 -> 1   -> USB2_ECS_SOFTIDEN_P0
+		//bit 27 -> 0   -> USB2_ECS_SOFTID_P0
+		//bit 28 -> 1   -> ????
+		//bit 29 -> 1   -> ????
 		usb_writel(0x37000000 | (0x3 << 4), acthcd->usbecs);
 	}
-	else {
+	else
+	{
 		usb_writel(0x37000000 | (0x10 << 13) | (0xb << 4), acthcd->usbecs);
 	}
 	
 	usleep_range(100, 120);
 	aotg_set_hcd_phy(hotplug);
 	
-	writeb(0x0, acthcd->base + TA_BCON_COUNT);
+	// time from B connection to host issue bus reset
+	// 110ms * (ta_bcon_count + 1)
+	writeb(0x0, acthcd->base + TA_BCON_COUNT); // set to 110ms
+	
 	usb_writeb(0xff, acthcd->base + TAAIDLBDIS);
-	usb_writeb(0xff, acthcd->base + TAWAITBCON);
-	usb_writeb(0x28, acthcd->base + TBVBUSDISPLS);
-	usb_setb(1 << 7, acthcd->base + TAWAITBCON);
+	
+	// wait B connection timeout
+	// timeout = register value[6:0] * 34.953ms
+	// if bit 7 is set, timeout is never generated, thus always wait
+	usb_writeb(BIT(7), acthcd->base + TAWAITBCON);
+	
+	// vbus discharge timer
+	// register value * 1.092ms
+	usb_writeb(0x28, acthcd->base + TBVBUSDISPLS); // 43.68ms
+	
 	usb_writew(0x1000, acthcd->base + VBUSDBCTIMERL);
 	
 	val8 = readb(acthcd->base + BKDOOR);
@@ -678,7 +788,7 @@ static void aotg_hw_shutdown(struct aotg_hotplug *hotplug)
 	}
 	if (atomic_xchg_release(&hotplug->rhstate, rhstate) != rhstate)
 	{
-		aotg_disable_irq(hotplug);
+		aotg_disable_bus(hotplug);
 		reset_control_assert(acthcd->rst);
 		atomic_set_release(&hotplug->prstate, 0);
 	}
@@ -701,7 +811,6 @@ static int aotg_hw_powerup(struct aotg_hotplug *hotplug)
 	if (!retval)
 	{
 		aotg_hw_setup(hotplug);
-		aotg_enable_irq(hotplug);
 		atomic_set_release(&hotplug->rhstate, AOTG_RH_POWERED);
 		return 0;
 	}

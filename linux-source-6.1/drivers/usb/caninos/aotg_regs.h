@@ -420,7 +420,7 @@
 
 #define OTGIRQ                  0x000001BC
 #define OTGSTATE                0x000001BD
-#define OTGCTRL                 0x000001BE
+
 #define OTGSTATUS               0x000001BF
 #define OTGIEN                  0x000001C0
 #define TAAIDLBDIS              0x000001C1
@@ -1004,16 +1004,7 @@
 #define AOTG_STATE_B_SRP_INIT		12
 #define AOTG_STATE_UNDEFINED		17
 
-/*bit 7:4 reserved*/
-/*OTGCTRL*/
-#define	OTGCTRL_FORCEBCONN      (1 << 7)
-/*bit 6 reserved*/
-#define	OTGCTRL_SRPDATDETEN     (1 << 5)
-#define	OTGCTRL_SRPVBUSDETEN    (1 << 4)
-#define	OTGCTRL_BHNPEN          (1 << 3)
-#define	OTGCTRL_ASETBHNPEN      (1 << 2)
-#define	OTGCTRL_ABUSDROP        (1 << 1)
-#define	OTGCTRL_BUSREQ          (1 << 0)
+
 
 /*OTGSTATUS*/
 /*bit 7 reserved*/

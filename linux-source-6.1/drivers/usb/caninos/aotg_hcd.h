@@ -119,23 +119,6 @@ enum control_phase {
 #define TD_IN_RING  (0x1 << 0)
 #define TD_IN_QUEUE (0x1 << 1)
 
-/* usbecs register. */
-#define USB2_ECS_VBUS_P0        (10)
-#define USB2_ECS_ID_P0          (12)
-#define USB2_ECS_LS_P0_SHIFT    (8)
-#define USB2_ECS_LS_P0_MASK     (0x3<<8)
-#define USB2_ECS_DPPUEN_P0      (3)
-#define USB2_ECS_DMPUEN_P0      (2)
-#define USB2_ECS_DMPDDIS_P0     (1)
-#define USB2_ECS_DPPDDIS_P0     (0)
-#define USB2_ECS_SOFTIDEN_P0    (1<<26)
-#define USB2_ECS_SOFTID_P0      (27)
-#define USB2_ECS_SOFTVBUSEN_P0  (1<<24)
-#define USB2_ECS_SOFTVBUS_P0    (25)
-
-
-
-
 struct aotg_ring
 {
 	unsigned is_running:1;
