@@ -214,9 +214,9 @@ struct aotg_hotplug
 	struct mutex lock;
 	atomic_t mailbox;
 	atomic_t running;
-	atomic_t prstate;
-	atomic_t rhstate;
-	int prev_prstate;
+	
+	volatile int port_stat;
+	int prev_port_stat;
 	u16 wPortChange;
 };
 
