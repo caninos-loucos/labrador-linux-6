@@ -32,72 +32,7 @@
 
 #include <linux/suspend.h>
 
-
 #include "aotg_hcd.h"
-
-static void release_fifo_addr(struct aotg_hcd *acthcd, ulong addr)
-{
-	int i;
-
-	for (i = addr/ALLOC_FIFO_UNIT; i < AOTG_MAX_FIFO_SIZE/ALLOC_FIFO_UNIT; i++) {
-		if ((acthcd->fifo_map[i] & 0x7FFFFFFF) == addr)
-			acthcd->fifo_map[i] = 0;
-		else
-			break;
-	}
-	return;
-}
-
-static inline int is_epfifo_busy(struct aotg_hcep *ep, int is_in)
-{
-	if (is_in)
-		return (EPCS_BUSY & readb(ep->reg_hcepcs)) == 0;
-	else
-		return (EPCS_BUSY & readb(ep->reg_hcepcs)) != 0;
-}
-
-static inline void ep_setup(struct aotg_hcep *ep, u8 type, u8 buftype)
-{
-	ep->buftype = buftype;
-	writeb(type | buftype, ep->reg_hcepcon);
-}
-
-static inline void aotg_sofirq_clr(struct aotg_hcd *acthcd)
-{
-	usb_setbitsb((1 << 1), acthcd->base + USBIRQ);
-}
-
-static inline void aotg_sofirq_on(struct aotg_hcd *acthcd)
-{
-	usb_setbitsb((1 << 1), acthcd->base + USBIEN);
-}
-
-static inline void aotg_sofirq_off(struct aotg_hcd *acthcd)
-{
-	usb_clearbitsb(1 << 1, acthcd->base + USBIEN);
-}
-
-static inline int get_subbuffer_count(u8 buftype)
-{
-	int count = 0;
-
-	switch (buftype) {
-	case EPCON_BUF_SINGLE:
-		count = 1;
-		break;
-	case EPCON_BUF_DOUBLE:
-		count = 2;
-		break;
-	case EPCON_BUF_TRIPLE:
-		count = 3;
-		break;
-	case EPCON_BUF_QUAD:
-		count = 4;
-		break;
-	}
-
-	return count;
-}
 
 static inline void aotg_config_hub_addr(struct urb *urb, struct aotg_hcep *ep)
 {
@@ -577,29 +512,12 @@ static int aotg_hub_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status
 	}
 	
 	spin_lock_irqsave(&acthcd->lock, flags);
-
+	
 	retval = usb_hcd_check_unlink_urb(hcd, urb, status);
 	
-	if (retval)
-	{
-		if (ep->type == PIPE_CONTROL)
-		{
-			dev_info(acthcd->dev, 
-			         "%s: unable to unlink urb, ep %d in/out, ptr 0x%llx\n", 
-			         __func__, ep->epnum, (u64)(dma_addr_t) ep->hep);
-		}
-		else
-		{
-			dev_info(acthcd->dev,
-			         "%s: unable to unlink urb, ep %d %s, ptr 0x%llx\n", 
-			         __func__, ep->epnum, ep->is_out ? "out" : "in",
-			         (u64)(dma_addr_t) ep->hep);
-		}
-		
-		spin_unlock_irqrestore(&acthcd->lock, flags);
-		return retval;
+	if (retval) {
+		goto dequeue_out;
 	}
-	
 	if (urb->ep != NULL) {
 		ep = (struct aotg_hcep *)urb->ep->hcpriv;
 	}
@@ -909,10 +827,11 @@ static void aotg_hub_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpo
 			acthcd->hcep_pool.outep[index] = NULL;
 		else
 			acthcd->hcep_pool.inep[index] = NULL;
-			
-		release_fifo_addr(acthcd, ep->fifo_addr);
+		
+		release_fifo_slot(acthcd, ep);
+		
 	}
-
+	
 	hep->hcpriv = NULL;
 	
 	if (ep->ring)
