@@ -85,61 +85,81 @@ void aotg_start_hotplug(struct aotg_hotplug *hotplug)
 	}
 }
 
+static bool status_changed(struct aotg_hotplug *hotplug, int ps)
+{
+	int prv = hotplug->prev_port_stat;
+	hotplug->prev_port_stat = ps;
+	
+	if ((ps & USB_PORT_STAT_CONNECTION) != (prv & USB_PORT_STAT_CONNECTION)) {
+		hotplug->wPortChange |= USB_PORT_STAT_C_CONNECTION;
+	}
+	if ((ps & USB_PORT_STAT_RESET) != (prv & USB_PORT_STAT_RESET)) {
+		hotplug->wPortChange |= USB_PORT_STAT_C_RESET;
+	}
+	
+	return (hotplug->wPortChange != 0);
+}
+
 static int hotplug_procedure(struct aotg_hotplug *hotplug)
 {
 	struct aotg_hcd *acthcd = hotplug->acthcd;
+	int msg, next_port_stat, retry;
 	unsigned long flags;
 	u8 otg_state;
 	long res;
-	int msg;
 	
 wait_connection:
 	
-	dev_info(acthcd->dev, "waiting for device connection\n");
+	mutex_lock(&hotplug->lock);
+	hotplug->port_stat = USB_PORT_STAT_POWER;
+	status_changed(hotplug, hotplug->port_stat);
+	mutex_unlock(&hotplug->lock);
 	
 	usb_setbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
+	usleep_range(2000, 2200);
 	
 	while (1)
 	{
 		int msg = atomic_fetch_and_acquire(0, &hotplug->mailbox);
 		
-		if (msg & MSG_CANCEL)
-		{
-			aotg_port_shutdown(hotplug);
+		if (msg & MSG_CANCEL) {
 			return -ECANCELED;
 		}
-		
-		otg_state = readb(acthcd->base + OTGSTATE);
-		
-		if (readb(acthcd->base + OTGSTATE) == A_HOST)
-		{
-			mutex_lock(&hotplug->lock);
-			hotplug->port_stat |= USB_PORT_STAT_CONNECTION;
-			mutex_unlock(&hotplug->lock);
-			
-			usb_clearbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
-			
-			dev_info(acthcd->dev, "device connected\n");
+		if (readb(acthcd->base + OTGSTATE) == A_HOST) {
 			break;
 		}
 		
 		wait_event_timeout(hotplug->event, 
 			atomic_read_acquire(&hotplug->mailbox) != 0,
-			msecs_to_jiffies(500));
+			msecs_to_jiffies(300));
 	}
 	
 port_reset:
 	
 	mutex_lock(&hotplug->lock);
+	hotplug->port_stat |= USB_PORT_STAT_CONNECTION;
 	hotplug->port_stat |= USB_PORT_STAT_RESET | USB_PORT_STAT_ENABLE;
+	status_changed(hotplug, hotplug->port_stat);
+	next_port_stat = hotplug->port_stat;
 	mutex_unlock(&hotplug->lock);
 	
-	dev_info(acthcd->dev, "device reset\n");
+	next_port_stat &= ~USB_PORT_STAT_RESET;
+	next_port_stat &= ~USB_PORT_STAT_HIGH_SPEED;
+	next_port_stat &= ~USB_PORT_STAT_LOW_SPEED;
+	
+	usb_clearbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
+	usleep_range(2000, 2200);
 	
 	spin_lock_irqsave(&hotplug->irq_lock, flags);
 	
+	// disable port reset irq
+	usb_clearbitsb(USBIEN_URES | USBIEN_HS, acthcd->base + USBIEN);
+	
 	// clear port reset irq
 	writeb(USBIRQ_URES | USBIRQ_HS, acthcd->base + USBIRQ);
+	
+	// clear mailbox
+	atomic_fetch_and_acquire(0, &hotplug->mailbox);
 	
 	// enable port reset irq
 	usb_setbitsb(USBIEN_URES | USBIEN_HS, acthcd->base + USBIEN);
@@ -149,51 +169,24 @@ port_reset:
 	
 	spin_unlock_irqrestore(&hotplug->irq_lock, flags);
 	
-	// port reset takes around 55ms to complete
-	res = msecs_to_jiffies(80);
+	// port reset takes 55ms to complete
+	res = msecs_to_jiffies(70); // 55ms + 15ms (extra)
 	do
 	{
 		int msg = atomic_fetch_and_acquire(0, &hotplug->mailbox);
 		
-		if (msg & MSG_CANCEL)
-		{
-			aotg_port_shutdown(hotplug);
+		if (msg & MSG_CANCEL) {
 			return -ECANCELED;
 		}
-		
-		if (msg & MSG_CS_HFMODE)
-		{
-			mutex_lock(&hotplug->lock);
-			hotplug->port_stat &= ~USB_PORT_STAT_RESET;
-			hotplug->port_stat &= ~USB_PORT_STAT_LOW_SPEED;
-			hotplug->port_stat |= USB_PORT_STAT_HIGH_SPEED;
-			mutex_unlock(&hotplug->lock);
-			
-			dev_info(acthcd->dev, "device is high speed\n");
+		if (msg & MSG_CS_HFMODE) {
+			next_port_stat |= USB_PORT_STAT_HIGH_SPEED;
 			break;
 		}
-		
-		if (msg & MSG_CS_LSMODE)
-		{
-			mutex_lock(&hotplug->lock);
-			hotplug->port_stat &= ~USB_PORT_STAT_RESET;
-			hotplug->port_stat &= ~USB_PORT_STAT_HIGH_SPEED;
-			hotplug->port_stat |= USB_PORT_STAT_LOW_SPEED;
-			mutex_unlock(&hotplug->lock);
-			
-			dev_info(acthcd->dev, "device is low speed\n");
+		if (msg & MSG_CS_LSMODE) {
+			next_port_stat |= USB_PORT_STAT_LOW_SPEED;
 			break;
 		}
-		
-		if (msg & MSG_CS_FSMODE)
-		{
-			mutex_lock(&hotplug->lock);
-			hotplug->port_stat &= ~USB_PORT_STAT_RESET;
-			hotplug->port_stat &= ~USB_PORT_STAT_HIGH_SPEED;
-			hotplug->port_stat &= ~USB_PORT_STAT_LOW_SPEED;
-			mutex_unlock(&hotplug->lock);
-			
-			dev_info(acthcd->dev, "device is full speed\n");
+		if (msg & MSG_CS_FSMODE) {
 			break;
 		}
 		
@@ -202,28 +195,65 @@ port_reset:
 		
 		if (res <= 0)
 		{
-			aotg_port_shutdown(hotplug);
-			dev_err(acthcd->dev, "reset timedout\n");
+			dev_err(acthcd->dev, "port reset timedout\n");
 			return -ETIMEDOUT;
 		}
 		
 	} while (res > 0);
 	
+	for (retry = 50; retry > 0; retry--)
+	{
+		msg = atomic_fetch_and_acquire(0, &hotplug->mailbox);
+		
+		if (msg & MSG_CANCEL) {
+			return -ECANCELED;
+		}
+		
+		otg_state = readb(acthcd->base + OTGSTATE);
+		
+		if (otg_state == A_HOST) {
+			break;
+		}
+		else if (otg_state == A_SUSPEND)
+		{
+			usb_setbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
+			usleep_range(5000, 5500);
+			//dev_info(acthcd->dev, "port resume\n");
+		}
+		else if (otg_state == A_WAIT_BCON) {
+			goto wait_connection;
+		}
+		else
+		{
+			dev_err(acthcd->dev, "invalid otg_state 0x%x\n", (u32)otg_state);
+			return -EAGAIN;
+		}
+	}
+	
+	if (next_port_stat & USB_PORT_STAT_LOW_SPEED) {
+		dev_info(acthcd->dev, "ls device connected\n");
+	}
+	else if (next_port_stat & USB_PORT_STAT_HIGH_SPEED) {
+		dev_info(acthcd->dev, "hs device connected\n");
+	}
+	else {
+		dev_info(acthcd->dev, "fs device connected\n");
+	}
+	
+	mutex_lock(&hotplug->lock);
+	hotplug->port_stat = next_port_stat;
+	status_changed(hotplug, hotplug->port_stat);
+	mutex_unlock(&hotplug->lock);
+	
 	while (1)
 	{
 		msg = atomic_fetch_and_acquire(0, &hotplug->mailbox);
 		
-		if (msg & MSG_CANCEL)
-		{
-			aotg_port_shutdown(hotplug);
+		if (msg & MSG_CANCEL) {
 			return -ECANCELED;
 		}
-		
-		if (msg & MSG_REQ_RESET)
-		{
+		if (msg & MSG_REQ_RESET) {
 			dev_info(acthcd->dev, "port reset requested\n");
-			
-			usb_clearbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
 			goto port_reset;
 		}
 		
@@ -231,17 +261,8 @@ port_reset:
 		
 		if (otg_state == A_WAIT_BCON)
 		{
-			mutex_lock(&hotplug->lock);
-			hotplug->port_stat = USB_PORT_STAT_POWER;
-			mutex_unlock(&hotplug->lock);
-			
+			dev_info(acthcd->dev, "device disconnected\n");
 			goto wait_connection;
-		}
-		else if (otg_state == A_SUSPEND)
-		{
-			usb_setbitsb(OTGCTRL_BUSREQ, acthcd->base + USBH_OTGCTRL);
-			
-			dev_info(acthcd->dev, "port resume\n");
 		}
 		else if (otg_state != A_HOST)
 		{
@@ -251,11 +272,9 @@ port_reset:
 		
 		wait_event_timeout(hotplug->event, 
 			atomic_read_acquire(&hotplug->mailbox) != 0,
-			msecs_to_jiffies(600));
+			msecs_to_jiffies(300));
 	}
 	
-	
-	aotg_port_shutdown(hotplug);
 	return -EAGAIN;
 }
 
@@ -274,8 +293,8 @@ static void hotplug_worker(struct work_struct *t)
 		if (retval == 0)
 		{
 			retval = hotplug_procedure(hotplug);
+			aotg_port_shutdown(hotplug);
 		}
-		
 		
 	} while (retval != -ECANCELED);
 	
@@ -287,21 +306,6 @@ static int hub_control_port_reset(struct aotg_hotplug *hotplug)
 	atomic_fetch_or_release(MSG_REQ_RESET, &hotplug->mailbox);
 	wake_up(&hotplug->event);
 	return 0;
-}
-
-static bool status_changed(struct aotg_hotplug *hotplug, int ps)
-{
-	int prv = hotplug->prev_port_stat;
-	hotplug->prev_port_stat = ps;
-	
-	if ((ps & USB_PORT_STAT_CONNECTION) != (prv & USB_PORT_STAT_CONNECTION)) {
-		hotplug->wPortChange |= USB_PORT_STAT_C_CONNECTION;
-	}
-	if ((ps & USB_PORT_STAT_RESET) != (prv & USB_PORT_STAT_RESET)) {
-		hotplug->wPortChange |= USB_PORT_STAT_C_RESET;
-	}
-	
-	return (hotplug->wPortChange != 0);
 }
 
 int aotg_hotplug_status_data(struct aotg_hotplug *hotplug, char *buf)
@@ -411,17 +415,13 @@ int aotg_hotplug_control(struct aotg_hotplug *hotplug,
 		}
 		
 		mutex_lock(&hotplug->lock);
-		
 		port = hotplug->port_stat;
 		status_changed(hotplug, port);
-		
 		wPortChange = hotplug->wPortChange;
 		hotplug->wPortChange = 0;
-		
 		mutex_unlock(&hotplug->lock);
 		
 		wPortStatus = port;
-		
 		*(__le16 *)buf = cpu_to_le16(wPortStatus);
 		*(__le16 *)(buf + 2) = cpu_to_le16(wPortChange);
 		break;
@@ -470,8 +470,6 @@ u32 aotg_hotplug_irq_handler(struct aotg_hotplug *hotplug)
 				// clear port reset irq
 				writeb(port_irq, acthcd->base + USBIRQ);
 				port_irq = 0;
-				
-				dev_info(acthcd->dev, "UIV_USBRESET\n");
 				
 				if (usbcs & USBCS_HFMODE) {
 					msg |= MSG_CS_HFMODE;
@@ -596,7 +594,7 @@ static void aotg_set_hcd_phy(struct aotg_hotplug *hotplug)
 		aotg_DD_set_phy(acthcd->base, 0xf4, 0xbb);
 		aotg_DD_set_phy(acthcd->base, 0xe0, 0x35);
 		aotg_DD_set_phy(acthcd->base, 0xf4, 0xbb);
-		aotg_DD_set_phy(acthcd->base, 0xe1, 0xcf);
+		aotg_DD_set_phy(acthcd->base, 0xe1, 0x6f);
 		aotg_DD_set_phy(acthcd->base, 0xf4, 0x9b);
 		aotg_DD_set_phy(acthcd->base, 0xe6, 0xcb);
 		aotg_DD_set_phy(acthcd->base, 0xf4, 0x9b);
@@ -604,7 +602,7 @@ static void aotg_set_hcd_phy(struct aotg_hotplug *hotplug)
 		aotg_DD_set_phy(acthcd->base, 0xf4, 0xbb);
 		aotg_DD_set_phy(acthcd->base, 0xe0, 0x31);
 		aotg_DD_set_phy(acthcd->base, 0xf4, 0x9b);
-		aotg_DD_set_phy(acthcd->base, 0xe4, 0xa6);
+		aotg_DD_set_phy(acthcd->base, 0xe4, 0xc5);
 		aotg_DD_set_phy(acthcd->base, 0xf0, 0xfc);
 	}
 }
@@ -626,10 +624,10 @@ static void aotg_port_shutdown(struct aotg_hotplug *hotplug)
 	
 	mutex_lock(&hotplug->lock);
 	hotplug->port_stat = 0;
+	status_changed(hotplug, hotplug->port_stat);
 	mutex_unlock(&hotplug->lock);
 	
 	reset_control_assert(acthcd->rst);
-	
 	dev_info(acthcd->dev, "host shutdown\n");
 }
 
@@ -700,10 +698,10 @@ static int aotg_port_powerup(struct aotg_hotplug *hotplug)
 	
 	mutex_lock(&hotplug->lock);
 	hotplug->port_stat = USB_PORT_STAT_POWER;
+	status_changed(hotplug, hotplug->port_stat);
 	mutex_unlock(&hotplug->lock);
 	
 	dev_info(acthcd->dev, "host powered\n");
-	
 	return 0;
 }
 
